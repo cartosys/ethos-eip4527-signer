@@ -1,1 +1,1 @@
-# The open-source reference transaction interpreter for ethOS
+# The open-source EVM transaction interpreter and signer for ethOS
