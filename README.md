@@ -1,1 +1,1 @@
-# ethos-eip4527-signer
+# The open-source reference transaction interpreter for ethOS
