@@ -1,0 +1,30 @@
+{
+  "name": "ethos-eip4527-signer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.23.0",
+  "devDependencies": {
+    "eslint": "^10.3.0",
+    "prettier": "^3.8.3",
+    "turbo": "^2.9.12",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}
+{
+  "name": "@ethos-eip4527-signer/shared-types",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  }
+}
