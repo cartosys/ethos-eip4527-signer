@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -16,15 +16,8 @@
     "turbo": "^2.9.12",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
-  }
-}
-{
-  "name": "@ethos-eip4527-signer/shared-types",
-  "version": "0.0.1",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "test": "vitest"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }
