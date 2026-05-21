@@ -157,14 +157,94 @@ src/              Library source — public API exported via index.ts
 
 examples/         Runnable reference examples
   eth-transfer.ts   Full EIP-4527 ETH transfer pipeline (build → CBOR → UR → QR)
+  erc20-transfer.ts ERC20 token transfer — ABI encode calldata, decode recipient from data field
   transfer.ts       Minimal TransactionEnvelope stub
 
 tests/            Vitest unit tests — mirror src/ and examples/ structure
-  validation.test.ts    Zod schema validation tests
-  eth-transfer.test.ts  EIP-4527 pipeline tests (48 tests)
+  validation.test.ts      Zod schema validation tests
+  eth-transfer.test.ts    EIP-4527 ETH pipeline tests (48 tests)
+  erc20-transfer.test.ts  ERC20 pipeline + fixture snapshot tests (39 tests)
+
+fixtures/         Golden snapshots for deterministic pipeline outputs
+  erc20-transfer.json
 
 docs/             Spec companion — implementation notes and UX standards
   eip4527-implementation-notes.md
   qr-encoding.md
   signing-ux-standards.md
 ```
+
+---
+
+# ERC20 Transfer Example
+
+## Purpose
+
+ERC20 token transfers look very different from ETH transfers at the transaction level:
+
+| Field | ETH Transfer | ERC20 Transfer |
+|-------|-------------|----------------|
+| `tx.to` | The recipient's address | The **token contract** address |
+| `tx.value` | ETH amount | `0` (no ETH sent) |
+| `tx.data` | `"0x"` (empty) | ABI-encoded `transfer(address,uint256)` call |
+
+A wallet that reads `tx.to` and displays it as "recipient" will show the user a **contract address**, not who is receiving their tokens. This is a real-world source of user confusion and has enabled phishing attacks.
+
+The ERC20 example proves the decode pipeline: ABI-encode the calldata, sign the transaction, then extract the true recipient and amount back from the calldata before displaying.
+
+## Running the ERC20 Example
+
+```bash
+npm run erc20-example
+# or
+pnpm run erc20-example
+```
+
+## Expected Output
+
+```
+─── ERC20 Token Transfer ─────────────────────────
+  Method:                transfer(address,uint256)
+  Network:               ethereum (chainId: 1)
+  Type:                  eip1559
+  Nonce:                 3
+  Token Contract:        0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+  Recipient:             0x742d35Cc6634C0532925a3b844Bc454e4438f44e
+  Amount:                100.000000 USDC
+  Gas Limit:             65000
+  Max Fee/Gas:           30 gwei
+  Max Priority Fee/Gas:  1.5 gwei
+─────────────────────────────────────────────────
+
+Calldata:
+  0xa9059cbb000000000000000000000000742d35cc...05f5e100
+
+UR string:
+  ur:eth-sign-request/taadaxonadgdaofgletobwhg...
+
+QR payload (terminal render):
+  [QR art rendered in terminal]
+```
+
+## Architecture: Shared Pipeline, New Decode Layer
+
+The ERC20 example imports `encodeToCbor`, `encodeToUr`, `decodeUrPayload`, and `generateQrPayload` directly from `eth-transfer.ts`. These four functions operate on any `Eip4527SignRequest` — the ERC20 signing payload is structured identically at the CBOR/UR level.
+
+What is new in `erc20-transfer.ts`:
+
+- **`buildErc20TransferTx()`** — ABI-encodes the `transfer(address,uint256)` calldata using `ethers.Interface`, then builds the EIP-1559 transaction with `value=0` and `to=tokenContract`
+- **`decodeErc20Transfer()`** — validates the 4-byte selector (`0xa9059cbb`), rejects short or mistyped calldata with typed `DgenError`, and ABI-decodes the recipient and amount
+- **`renderHumanReadable()`** — displays the decoded recipient (from calldata), not `tx.to` (the contract)
+
+The fixture at `fixtures/erc20-transfer.json` locks down the deterministic output of the full pipeline. Any change to ABI encoding, CBOR structure, or UR encoding will break the fixture tests — by design.
+
+## Why Calldata Decoding Matters for Wallet Security
+
+Hardware wallets and air-gapped signers that display only `tx.to` and `tx.value` are blind to ERC20 transfers. An attacker can craft a transaction that appears to send `0 ETH to some contract` while actually calling `transfer(attacker, 1_000_000_000_000)` on a user's token.
+
+The minimum safe display for any transaction with non-empty calldata:
+1. Decode the method selector — is it a known method?
+2. ABI-decode the arguments and display them
+3. If the calldata cannot be decoded, display it raw with a warning
+
+This corpus example provides a tested, typed reference implementation that wallet teams can adapt directly.

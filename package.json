@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "example": "tsx examples/eth-transfer.ts",
+    "erc20-example": "tsx examples/erc20-transfer.ts",
     "test": "vitest run"
   },
   "keywords": [],
