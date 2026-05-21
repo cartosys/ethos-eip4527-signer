@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "example": "tsx examples/eth-transfer.ts",
     "test": "vitest run"
   },
   "keywords": [],
@@ -11,13 +12,20 @@
   "license": "ISC",
   "packageManager": "pnpm@10.23.0",
   "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/qrcode": "^1.5.6",
     "eslint": "^10.3.0",
     "prettier": "^3.8.3",
+    "tsx": "^4.22.3",
     "turbo": "^2.9.12",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   },
   "dependencies": {
+    "@ngraveio/bc-ur": "^1.1.13",
+    "cbor-x": "^1.6.4",
+    "ethers": "^6.16.0",
+    "qrcode": "^1.5.4",
     "zod": "^4.4.3"
   }
 }

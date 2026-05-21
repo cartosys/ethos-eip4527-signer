@@ -1,3 +1,6 @@
+import type { TransactionEnvelope } from "./transaction";
+import type { HumanReadableAction, SecurityWarning } from "./actions";
+
 export interface SignerRequest {
   transaction: TransactionEnvelope;
 

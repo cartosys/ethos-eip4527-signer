@@ -1,3 +1,5 @@
+import type { SupportedChain } from "./chains";
+
 export interface TransactionEnvelope {
   chain: SupportedChain;
 
