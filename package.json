@@ -7,6 +7,7 @@
     "example": "tsx examples/eth-transfer.ts",
     "erc20-example": "tsx examples/erc20-transfer.ts",
     "permit2-example": "tsx examples/permit2.ts",
+    "swap-example": "tsx examples/uniswap-swap.ts",
     "test": "vitest run"
   },
   "keywords": [],

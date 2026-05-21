@@ -336,3 +336,107 @@ What is new in `examples/permit2.ts`:
 - **`renderHumanReadable()`** — displays all approval fields and any warnings before signing
 
 `encodeToUr()` and `generateQrPayload()` are imported from `eth-transfer.ts` — they operate on CBOR bytes and UR strings and are fully reusable regardless of `data-type`.
+
+---
+
+# Uniswap V3 Swap Example
+
+## Why Swap Transactions Are Hard to Interpret
+
+A Uniswap V3 swap looks like this at the raw transaction level:
+
+| Field | Value | What users see without decoding |
+|-------|-------|----------------------------------|
+| `tx.to` | SwapRouter address | "Sending to an unknown contract" |
+| `tx.value` | 0.5 ETH (for ETH input) | "Sending 0.5 ETH to a contract" |
+| `tx.data` | 260 bytes of ABI-encoded calldata | Opaque hex string |
+
+Without calldata decoding, a wallet cannot tell the user:
+- Which tokens are being swapped
+- What the minimum acceptable output is
+- Whether slippage protection is set
+- When the approval expires
+- Whether the router is a recognized protocol
+
+This example proves the full decode pipeline for `exactInputSingle` on Uniswap V3 SwapRouter.
+
+## Running the Uniswap Swap Example
+
+```bash
+npm run swap-example
+# or
+pnpm run swap-example
+```
+
+## Expected Output
+
+```
+─── Uniswap V3 Swap ──────────────────────────────
+  Swap:                  0.500000 ETH
+  For at least:          1450.000000 USDC
+  Protocol:              Uniswap V3 SwapRouter
+  Route:                 ETH → USDC
+  Router:                Uniswap V3 SwapRouter (0xE592427A0AEce92De3Edee1F18E0157C05861564)
+  Recipient:             0x742d35Cc6634C0532925a3b844Bc454e4438f44e
+  Fee Tier:              0.05% (500)
+  Slippage Protection:   Enabled
+  Deadline:              2027-01-01T00:00:00.000Z
+  Network:               ethereum (chainId: 1)
+  Gas Limit:             210000
+  Max Fee/Gas:           30 gwei
+  Max Priority Fee/Gas:  1.5 gwei
+  ─── Security Notice ────────────────────────────
+  If market price moves before execution, output may differ from estimate.
+─────────────────────────────────────────────────
+```
+
+## Slippage and Deadlines
+
+**Slippage** (`amountOutMinimum`): The minimum number of output tokens the user will accept. Setting this to `0` means the user will accept any amount — including 1 wei — making the trade immediately sandwichable. MEV bots monitor the mempool for zero-slippage swaps and extract essentially the full input value.
+
+**Deadline**: The unix timestamp after which the swap reverts on-chain. Without a deadline, a signed transaction can be held in the mempool and executed at an arbitrarily unfavorable price days later. A short deadline (minutes, not hours) forces the swap to execute near the current market price or not at all.
+
+## Security Warning Analysis
+
+`validateSwapPayload(result, now?)` inspects the swap and returns typed warnings:
+
+| Code | Condition |
+|------|-----------|
+| `ZERO_AMOUNT_OUT_MINIMUM` | `amountOutMinimum === 0` — 100% slippage, sandwichable |
+| `EXPIRED_DEADLINE` | `deadline <= now` — tx reverts on-chain immediately |
+| `UNKNOWN_ROUTER` | Router not in `KNOWN_ROUTERS` whitelist |
+| `ZERO_RECIPIENT` | `recipient === 0x0000...` — output tokens are burned |
+| `UNUSUAL_FEE_TIER` | Fee not in standard tiers (100, 500, 3000, 10000) |
+| `EXCESSIVE_FEE_TIER` | Fee > 10000 — exceeds Uniswap protocol maximum |
+| `ETH_VALUE_MISMATCH` | `tx.value !== amountIn` when tokenIn is WETH9 |
+
+## How Calldata Decoding Improves Wallet UX
+
+A hardware wallet or air-gapped signer that decodes `exactInputSingle` calldata can display:
+1. The actual tokens being swapped (not just "sending ETH to a contract")
+2. The minimum output — so users know their slippage floor
+3. The deadline — so users can assess staleness risk
+4. The pool fee tier — an unusual tier may signal a non-standard or malicious pool
+5. The true recipient — important when the recipient differs from msg.sender
+
+The fixture at `fixtures/uniswap-swap.json` locks the deterministic calldata, CBOR, and UR output. Any change to ABI encoding or CBOR structure will break the fixture tests — by design.
+
+## Architecture
+
+What is new in `examples/uniswap-swap.ts`:
+
+- **`buildUniswapSwapTx()`** — ABI-encodes `exactInputSingle` calldata using `ethers.Interface`, builds the EIP-1559 transaction with `to = router`, `value = amountIn` for ETH swaps
+- **`decodeSwapCalldata()`** — validates the 4-byte selector (`0x414bf389`), rejects short/malformed calldata with typed `DgenError`, ABI-decodes all struct fields, then validates through a Zod schema
+- **`validateSwapPayload()`** — analyzes the decoded swap for security conditions (zero slippage, expired deadline, unknown router, etc.) and returns typed `SwapWarning[]`
+- **`renderHumanReadable()`** — displays the swap intent (tokens, amounts, slippage, deadline) rather than raw tx fields, includes a static MEV notice and any dynamic warnings
+
+`encodeToCbor()`, `encodeToUr()`, `decodeUrPayload()`, and `generateQrPayload()` are re-exported from `eth-transfer.ts` — the swap uses `data-type: 1` (transaction bytes), identical to ETH and ERC20 transfers.
+
+## Future Extensibility
+
+The architecture supports adding:
+- **`exactInput` (multi-hop)**: Extend `decodeSwapCalldata` with a `decodePath(bytes)` helper that parses the `(address, uint24, address, uint24, ..., address)` path encoding
+- **Uniswap V4**: Add hook address and hookData fields to `UniswapSwapDetails`
+- **Universal Router**: Decode multicall `commands` array, each byte a sub-command type
+- **Permit2 + swap**: Combine a Permit2 `PERMIT` action with an `EXACT_INPUT` command in a single Universal Router multicall
+- **Aggregators**: Extend `KNOWN_ROUTERS` and add a `routerType` discriminant to select the right decoder
