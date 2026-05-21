@@ -1,0 +1,37 @@
+{
+  "transaction": {
+    "chainId": 1,
+    "safeAddress": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+    "owners": [
+      "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+    ],
+    "threshold": 2,
+    "nonce": 14,
+    "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "value": "0",
+    "data": "0xa9059cbb000000000000000000000000742d35cc6634c0532925a3b844bc454e4438f44e000000000000000000000000000000000000000000000000000000012a05f200",
+    "operation": 0,
+    "safeTxGas": "0",
+    "baseGas": "0",
+    "gasPrice": "0",
+    "gasToken": "0x0000000000000000000000000000000000000000",
+    "refundReceiver": "0x0000000000000000000000000000000000000000",
+    "nestedTokenSymbol": "USDC",
+    "nestedTokenDecimals": 6,
+    "origin": "ethos-eip4527-signer"
+  },
+  "safeTxHash": "0x4003167279aac0971af7349e390730880dcf57220e01fea90cc0673b3935e0e3",
+  "nestedCalldata": "0xa9059cbb000000000000000000000000742d35cc6634c0532925a3b844bc454e4438f44e000000000000000000000000000000000000000000000000000000012a05f200",
+  "decodedNested": {
+    "type": "erc20_transfer",
+    "methodSelector": "0xa9059cbb",
+    "methodName": "transfer(address,uint256)",
+    "recipient": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    "rawAmount": "5000000000"
+  },
+  "cborHex": "d90103a5015005ce8a4613579bdf05ce8a4613579bdf025903847b22646f6d61696e223a7b22636861696e4964223a312c22766572696679696e67436f6e7472616374223a22307839393635353037443161353562634332363935433538626131364642333764383139423041346463227d2c227479706573223a7b22536166655478223a5b7b226e616d65223a22746f222c2274797065223a2261646472657373227d2c7b226e616d65223a2276616c7565222c2274797065223a2275696e74323536227d2c7b226e616d65223a2264617461222c2274797065223a226279746573227d2c7b226e616d65223a226f7065726174696f6e222c2274797065223a2275696e7438227d2c7b226e616d65223a22736166655478476173222c2274797065223a2275696e74323536227d2c7b226e616d65223a2262617365476173222c2274797065223a2275696e74323536227d2c7b226e616d65223a226761735072696365222c2274797065223a2275696e74323536227d2c7b226e616d65223a22676173546f6b656e222c2274797065223a2261646472657373227d2c7b226e616d65223a22726566756e645265636569766572222c2274797065223a2261646472657373227d2c7b226e616d65223a226e6f6e6365222c2274797065223a2275696e74323536227d5d7d2c226d657373616765223a7b22746f223a22307841306238363939316336323138623336633164313944346132653945623063453336303665423438222c2276616c7565223a2230222c2264617461223a22307861393035396362623030303030303030303030303030303030303030303030303734326433356363363633346330353332393235613362383434626334353465343433386634346530303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030313261303566323030222c226f7065726174696f6e223a302c22736166655478476173223a2230222c2262617365476173223a2230222c226761735072696365223a2230222c22676173546f6b656e223a22307830303030303030303030303030303030303030303030303030303030303030303030303030303030222c22726566756e645265636569766572223a22307830303030303030303030303030303030303030303030303030303030303030303030303030303030222c226e6f6e6365223a31347d2c227072696d61727954797065223a22536166655478227d0302040107746574686f732d656970343532372d7369676e6572",
+  "urString": "ur:eth-sign-request/taadaxonadgdahtolefgbwhgndurahtolefgbwhgnduraohkaxlrkgcpiejljnhsinjtcpftkgcpiaishsinjtgaiecpftehdwcpkoihjpiniykkinjtiofxjljtjyjphsiajycpftcpdyksesesenececdyemfyehhsececidiafxeyenesecfxecetidhsehenfgfweoemieetehesfwdyfpeeieiacpkidwcpjykkjoihjkcpftkgcpguhsiyihghkscpfthpkgcpjthsjnihcpftcpjyjlcpdwcpjykkjoihcpftcphsieiejpihjkjkcpkidwkgcpjthsjnihcpftcpkohsjzkpihcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkidwkgcpjthsjnihcpftcpiehsjyhscpdwcpjykkjoihcpftcpidkkjyihjkcpkidwkgcpjthsjnihcpftcpjljoihjphsjyinjljtcpdwcpjykkjoihcpftcpkpinjtjyetcpkidwkgcpjthsjnihcpftcpjkhsiyihghksflhsjkcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkidwkgcpjthsjnihcpftcpidhsjkihflhsjkcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkidwkgcpjthsjnihcpftcpiohsjkgdjpiniaihcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkidwkgcpjthsjnihcpftcpiohsjkghjljeihjtcpdwcpjykkjoihcpftcphsieiejpihjkjkcpkidwkgcpjthsjnihcpftcpjpihiykpjtiegmihiaihinkoihjpcpdwcpjykkjoihcpftcphsieiejpihjkjkcpkidwkgcpjthsjnihcpftcpjtjljtiaihcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkihlkidwcpjnihjkjkhsioihcpftkgcpjyjlcpftcpdyksfpdyidetenesesehiaeneyehetideoeniaehieehesfyeehseyihesfeiddyiafeeoendyenihfweeetcpdwcpkohsjzkpihcpftcpdycpdwcpiehsjyhscpftcpdykshsesdyecesiaididdydydydydydydydydydydydydydydydydydydydydydydydyemeeeyieeoeciaiaeneneoeeiadyeceoeyeseyechseoideteeeeidiaeeeceeiheeeeeoetiyeeeeihdydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydyeheyhsdyeciyeydydycpdwcpjljoihjphsjyinjljtcpftdydwcpjkhsiyihghksflhsjkcpftcpdycpdwcpidhsjkihflhsjkcpftcpdycpdwcpiohsjkgdjpiniaihcpftcpdycpdwcpiohsjkghjljeihjtcpftcpdyksdydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydycpdwcpjpihiykpjtiegmihiaihinkoihjpcpftcpdyksdydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydydycpdwcpjtjljtiaihcpfteheekidwcpjojpinjnhsjpkkghkkjoihcpftcpguhsiyihghkscpkiaxaoaaadatjyihjyisjljkdpihinjoeeeceyemdpjkiniojtihjpmnrdcapf",
+  "humanReadable": "─── Safe Multisig Transaction ────────────────────\n  Safe:                  0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc\n  Network:               ethereum (chainId: 1)\n  Threshold:             2 of 3 owner(s) required\n  Nonce:                 14\n  ─── Proposed Action ────────────────────────────\n  Action:                ERC20 Transfer\n  Token Contract:        0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\n  Recipient:             0x742d35Cc6634C0532925a3b844Bc454e4438f44e\n  Amount:                5000.000000 USDC\n  ETH Value:             0 ETH\n  Operation:             CALL\n  ─── Gas & Refund ───────────────────────────────\n  Safe Tx Gas:           0\n  Base Gas:              0\n  Gas Price:             0 (no reimbursement)\n  Gas Token:             ETH (native)\n  Refund Receiver:       None (tx.origin)\n  ─── Signing ────────────────────────────────────\n  Safe Tx Hash:          0x4003167279aac0971af7349e390730880dcf57220e01fea90cc0673b3935e0e3\n  ─── Notice ─────────────────────────────────────\n  This transaction executes only after 2 owner signature(s) are collected.\n─────────────────────────────────────────────────"
+}

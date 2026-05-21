@@ -438,5 +438,128 @@ The architecture supports adding:
 - **`exactInput` (multi-hop)**: Extend `decodeSwapCalldata` with a `decodePath(bytes)` helper that parses the `(address, uint24, address, uint24, ..., address)` path encoding
 - **Uniswap V4**: Add hook address and hookData fields to `UniswapSwapDetails`
 - **Universal Router**: Decode multicall `commands` array, each byte a sub-command type
+
+---
+
+# Example 5: Safe Multisig Transaction
+
+```bash
+pnpm run multisig-example
+```
+
+Demonstrates signing a Gnosis Safe (Safe{Wallet}) multisig transaction using EIP-712 typed data, transported via EIP-4527 QR encoding.
+
+## What is a Safe multisig transaction?
+
+A Safe is an on-chain smart contract wallet that requires M-of-N owner signatures before executing any transaction. Each proposed transaction is identified by a *SafeTx hash* — a deterministic EIP-712 hash that commits to:
+
+- The Safe's address and chain (replay protection across chains and Safe deployments)
+- All transaction fields: target, value, calldata, operation, gas parameters
+- The nonce (prevents the same transaction being executed twice)
+
+Each owner signs the SafeTx hash using `eth_signTypedData` (EIP-712). Once M signatures are collected, any address can call `execTransaction` on the Safe contract.
+
+## Why is nested calldata decoding critical?
+
+The `data` field of a Safe transaction contains ABI-encoded calldata for the nested action. Without decoding it, a signer sees only an opaque hex blob — they cannot verify what they are actually approving. `examples/multisig-payload.ts` decodes known selectors and surfaces the true intent:
+
+- `0x` / empty → native ETH transfer (no contract call)
+- `0xa9059cbb` → ERC20 `transfer(address,uint256)` — shows recipient and amount
+- anything else → unknown, surfaced as `UNKNOWN_NESTED_CALLDATA` warning
+
+## Expected output
+
+```
+─── Safe Multisig Transaction ────────────────────
+  Safe:                  0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
+  Network:               ethereum (chainId: 1)
+  Threshold:             2 of 3 owner(s) required
+  Nonce:                 14
+  ─── Proposed Action ────────────────────────────
+  Action:                ERC20 Transfer
+  Token Contract:        0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+  Recipient:             0x742d35Cc6634C0532925a3b844Bc454e4438f44e
+  Amount:                5000.000000 USDC
+  ETH Value:             0 ETH
+  Operation:             CALL
+  ─── Gas & Refund ───────────────────────────────
+  Safe Tx Gas:           0
+  Base Gas:              0
+  Gas Price:             0 (no reimbursement)
+  Gas Token:             ETH (native)
+  Refund Receiver:       None (tx.origin)
+  ─── Signing ────────────────────────────────────
+  Safe Tx Hash:          0x4003167279aac0971af7349e390730880dcf57220e01fea90cc0673b3935e0e3
+  ─── Notice ─────────────────────────────────────
+  This transaction executes only after 2 owner signature(s) are collected.
+─────────────────────────────────────────────────
+```
+
+## Security warning codes
+
+| Code | Meaning |
+|------|---------|
+| `DELEGATECALL` | `operation=1` — the target runs in the Safe's storage context. A malicious target can drain funds or modify ownership. Always warn prominently. |
+| `ZERO_THRESHOLD` | `threshold=0` — any address can execute. The Safe is effectively unprotected. |
+| `INVALID_THRESHOLD` | `threshold > owners.length` — quorum can never be reached. Safe is bricked. |
+| `HIGH_SAFE_TX_GAS` | `safeTxGas > 500,000` — unusually high gas forwarded to the nested call. |
+| `HIGH_BASE_GAS` | `baseGas > 100,000` — inflates the gas reimbursement. Combined with a malicious refundReceiver, can drain ETH. |
+| `GAS_TOKEN_SET` | Non-zero `gasToken` — gas reimbursed in ERC20. Verify the token is legitimate. |
+| `DANGEROUS_REFUND_RECEIVER` | Non-zero `refundReceiver` — gas reimbursement sent to a specific address. Verify it is Safe-owner-controlled. |
+| `UNKNOWN_NESTED_CALLDATA` | Unrecognized selector in `data`. Signer cannot verify what action they are approving. |
+
+## Updated folder structure
+
+```
+examples/
+  eth-transfer.ts       # Example 1: native ETH transfer
+  erc20-transfer.ts     # Example 2: ERC20 token transfer
+  permit2.ts            # Example 3: Permit2 EIP-712 approval
+  uniswap-swap.ts       # Example 4: Uniswap V3 exactInputSingle
+  multisig-payload.ts   # Example 5: Safe multisig SafeTx (this example)
+fixtures/
+  eth-transfer.json
+  erc20-transfer.json
+  permit2.json
+  uniswap-swap.json
+  multisig-payload.json # Deterministic SafeTx hash, CBOR, UR golden snapshot
+tests/
+  eth-transfer.test.ts
+  erc20-transfer.test.ts
+  permit2.test.ts
+  uniswap-swap.test.ts
+  multisig-payload.test.ts
+```
+
+## Architecture
+
+What is new in `examples/multisig-payload.ts`:
+
+- **`buildMultisigPayload()`** — validates all addresses, builds the EIP-712 `SafeDomain` (no `name`/`version`), computes `safeTxHash` via `TypedDataEncoder.hash`, JSON-encodes the typed data as UTF-8 `signData`, decodes the nested calldata
+- **`decodeNestedCalldata()`** — non-throwing; identifies ETH transfers, ERC20 `transfer()`, or unknown selectors; unknown state is a warning, not a fatal error
+- **`decodeSafeTransaction()`** — parses UTF-8 sign-data bytes → JSON → Zod-validated `SafeTypedData`
+- **`decodeMultisigUrPayload()`** — UR → CBOR → sign-data bytes → `decodeSafeTransaction`
+- **`validateMultisigPayload()`** — returns typed `MultisigWarning[]` ordered by severity; DELEGATECALL > threshold issues > gas issues
+- **`renderHumanReadable()`** — shows nested action intent, not raw hex; DELEGATECALL surfaces prominently in the operation line and the security warnings section
+
+`encodeToCbor()` is local (uses `data-type: 2` for EIP-712 typed data, not `data-type: 1`). `encodeToUr()` and `generateQrPayload()` are re-exported from `eth-transfer.ts`.
+
+## Safe EIP-712 domain
+
+The Safe domain intentionally omits `name` and `version`:
+
+```typescript
+{ chainId: 1, verifyingContract: "0x9965507D..." }
+```
+
+Adding those fields produces an incorrect domain separator — the final `safeTxHash` would not match what the Safe contract verifies on-chain. This is a known Safe-specific divergence from the generic EIP-712 spec.
+
+## Future Extensibility
+
+The architecture supports adding:
+- **Safe multiSend**: Extend `decodeNestedCalldata` with a `decodeMultiSendCalldata(data)` path for the `0x8d80ff0a` selector — each sub-call is a `(operation, to, value, dataLength, data)` tuple
+- **ERC20 approve decoding**: Add `0x095ea7b3` to the selector dispatch table to surface unlimited approvals as high-severity warnings
+- **Simulation**: Add a `simulationResult` field to `SafeMultisigResult` populated by Tenderly/Alchemy before display — show net asset changes alongside the static interpretation
+- **EIP-4337 UserOperations**: Use `op.callData` as the nested data field, adjust the domain to the EntryPoint address
 - **Permit2 + swap**: Combine a Permit2 `PERMIT` action with an `EXACT_INPUT` command in a single Universal Router multicall
 - **Aggregators**: Extend `KNOWN_ROUTERS` and add a `routerType` discriminant to select the right decoder
