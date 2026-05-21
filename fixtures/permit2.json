@@ -1,0 +1,36 @@
+{
+  "params": {
+    "chainId": 1,
+    "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "tokenSymbol": "USDC",
+    "tokenDecimals": 6,
+    "spender": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+    "amount": "1000000000",
+    "expiration": 1798761600,
+    "nonce": 0,
+    "sigDeadline": "1798761600",
+    "origin": "ethos-eip4527-signer"
+  },
+  "signingHash": "0xb2d86d3cd646da5201bd47b73fc0f2a6256da5da3d49702793b703f9f46883f0",
+  "cborHex": "d90103a5015003579bdf13ce8a4603579bdf13ce8a460259028d7b22646f6d61696e223a7b226e616d65223a225065726d697432222c22636861696e4964223a312c22766572696679696e67436f6e7472616374223a22307830303030303030303030323244343733303330463131366444454539463642343361433738424133227d2c227479706573223a7b225065726d697444657461696c73223a5b7b226e616d65223a22746f6b656e222c2274797065223a2261646472657373227d2c7b226e616d65223a22616d6f756e74222c2274797065223a2275696e74313630227d2c7b226e616d65223a2265787069726174696f6e222c2274797065223a2275696e743438227d2c7b226e616d65223a226e6f6e6365222c2274797065223a2275696e743438227d5d2c225065726d697453696e676c65223a5b7b226e616d65223a2264657461696c73222c2274797065223a225065726d697444657461696c73227d2c7b226e616d65223a227370656e646572222c2274797065223a2261646472657373227d2c7b226e616d65223a22736967446561646c696e65222c2274797065223a2275696e74323536227d5d7d2c226d657373616765223a7b2264657461696c73223a7b22746f6b656e223a22307841306238363939316336323138623336633164313944346132653945623063453336303665423438222c22616d6f756e74223a2231303030303030303030222c2265787069726174696f6e223a313739383736313630302c226e6f6e6365223a307d2c227370656e646572223a22307831313131313131323534454542323534373742363866623835456439323966373341393630353832222c22736967446561646c696e65223a2231373938373631363030227d2c227072696d61727954797065223a225065726d697453696e676c65227d0302040107746574686f732d656970343532372d7369676e6572",
+  "urString": "ur:eth-sign-request/taadaxonadgdaxhgndurbwtolefgaxhgndurbwtolefgaohkaolgkgcpiejljnhsinjtcpftkgcpjthsjnihcpftcpgdihjpjninjyeycpdwcpiaishsinjtgaiecpftehdwcpkoihjpiniykkinjtiofxjljtjyjphsiajycpftcpdyksdydydydydydydydydydyeyeyfyeeemeodyeodyfgeheheniefyfefeesfgenfweeeohsfxemetfwfpeocpkidwcpjykkjoihjkcpftkgcpgdihjpjninjyfyihjyhsinjzjkcpfthpkgcpjthsjnihcpftcpjyjljeihjtcpdwcpjykkjoihcpftcphsieiejpihjkjkcpkidwkgcpjthsjnihcpftcphsjnjlkpjtjycpdwcpjykkjoihcpftcpkpinjtjyehendycpkidwkgcpjthsjnihcpftcpihksjoinjphsjyinjljtcpdwcpjykkjoihcpftcpkpinjtjyeeetcpkidwkgcpjthsjnihcpftcpjtjljtiaihcpdwcpjykkjoihcpftcpkpinjtjyeeetcpkihldwcpgdihjpjninjyguinjtiojzihcpfthpkgcpjthsjnihcpftcpieihjyhsinjzjkcpdwcpjykkjoihcpftcpgdihjpjninjyfyihjyhsinjzjkcpkidwkgcpjthsjnihcpftcpjkjoihjtieihjpcpdwcpjykkjoihcpftcphsieiejpihjkjkcpkidwkgcpjthsjnihcpftcpjkiniofyihhsiejzinjtihcpdwcpjykkjoihcpftcpkpinjtjyeyecencpkihlkidwcpjnihjkjkhsioihcpftkgcpieihjyhsinjzjkcpftkgcpjyjljeihjtcpftcpdyksfpdyidetenesesehiaeneyehetideoeniaehieehesfyeehseyihesfeiddyiafeeoendyenihfweeetcpdwcphsjnjlkpjtjycpftcpehdydydydydydydydydycpdwcpihksjoinjphsjyinjljtcpftehemesetemenehendydydwcpjtjljtiaihcpftdykidwcpjkjoihjtieihjpcpftcpdykseheheheheheheheyeceefefefweyeceeememfwenetiyidetecfeieeseyesiyemeofpesendyeceteycpdwcpjkiniofyihhsiejzinjtihcpftcpehemesetemenehendydycpkidwcpjojpinjnhsjpkkghkkjoihcpftcpgdihjpjninjyguinjtiojzihcpkiaxaoaaadatjyihjyisjljkdpihinjoeeeceyemdpjkiniojtihjplrtoptwe",
+  "decodedTypedData": {
+    "primaryType": "PermitSingle",
+    "domain": {
+      "name": "Permit2",
+      "chainId": 1,
+      "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+    },
+    "message": {
+      "details": {
+        "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "amount": "1000000000",
+        "expiration": 1798761600,
+        "nonce": 0
+      },
+      "spender": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "sigDeadline": "1798761600"
+    }
+  },
+  "humanReadable": "─── Permit2 Token Approval ───────────────────────\n  Type:                  EIP-712 Typed Data\n  Protocol:              Permit2 (Uniswap)\n  Network:               ethereum (chainId: 1)\n  Token:                 USDC (0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)\n  Spender:               0x1111111254EEB25477B68fb85Ed929f73A960582\n  Amount:                1000.000000 USDC\n  Expiration:            2027-01-01T00:00:00.000Z\n  Nonce:                 0\n  Sig Deadline:          2027-01-01T00:00:00.000Z\n  Signing Hash:          0xb2d86d3cd646da5201bd47b73fc0f2a6256da5da3d49702793b703f9f46883f0\n─────────────────────────────────────────────────"
+}

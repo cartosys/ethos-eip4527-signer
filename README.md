@@ -248,3 +248,91 @@ The minimum safe display for any transaction with non-empty calldata:
 3. If the calldata cannot be decoded, display it raw with a warning
 
 This corpus example provides a tested, typed reference implementation that wallet teams can adapt directly.
+
+---
+
+# Permit2 Example
+
+## Purpose
+
+[Permit2](https://github.com/Uniswap/permit2) is Uniswap's canonical off-chain token approval protocol. Unlike ERC20 `approve()`, Permit2 signatures are:
+
+- **Off-chain** — no gas cost, no on-chain transaction before the transfer
+- **Typed** — EIP-712 structured data the wallet can parse and display
+- **Expiring** — every approval has a deadline; unlimited approvals are a visible red flag
+- **Revocable** — nonce-based, so a permit can be invalidated before use
+
+This example demonstrates the key differences from the ETH and ERC20 corpus examples:
+
+| Field | ETH Transfer | ERC20 Transfer | Permit2 |
+|-------|-------------|----------------|---------|
+| EIP-4527 `data-type` | `1` (transaction) | `1` (transaction) | `2` (typed-data) |
+| `sign-data` content | RLP-encoded tx | RLP-encoded tx | JSON EIP-712 typed data |
+| On-chain tx? | Yes | Yes | No |
+| Signing hash | EIP-1559 tx hash | EIP-1559 tx hash | EIP-712 domain + message hash |
+
+The Permit2 domain intentionally omits the `"version"` field — the Permit2 contract does not register one. Wallets that add `"version"` will compute a wrong signing hash and the approval will be rejected.
+
+## Running the Permit2 Example
+
+```bash
+npm run permit2-example
+# or
+pnpm run permit2-example
+```
+
+## Expected Output
+
+```
+─── Permit2 Token Approval ───────────────────────
+  Type:                  EIP-712 Typed Data
+  Protocol:              Permit2 (Uniswap)
+  Network:               ethereum (chainId: 1)
+  Token:                 USDC (0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+  Spender:               0x1111111254EEB25477B68fb85Ed929f73A960582
+  Amount:                1000.000000 USDC
+  Expiration:            2027-01-01T00:00:00.000Z
+  Nonce:                 0
+  Sig Deadline:          2027-01-01T00:00:00.000Z
+  Signing Hash:          0xb2d86d3cd646da5...
+─────────────────────────────────────────────────
+
+Signing Hash:
+  0xb2d86d3cd646da5...
+
+CBOR hex:
+  d90103a5015003579bdf13ce...
+
+UR string:
+  ur:eth-sign-request/taadaxonadgd...
+
+QR payload (terminal render):
+  [QR art rendered in terminal]
+```
+
+## Security Warning Analysis
+
+`analyzePermit2(typedData)` inspects the permit and returns typed warnings:
+
+| Code | Condition |
+|------|-----------|
+| `UNLIMITED_APPROVAL` | `amount === uint160.max` — spender can drain all tokens |
+| `ZERO_AMOUNT` | `amount === 0` — permit grants no spending power |
+| `EXPIRED_PERMIT` | `expiration <= now` — signing has no effect |
+| `LONG_EXPIRATION` | `expiration > now + 1 year` — long-lived approval risk |
+| `ZERO_ADDRESS_SPENDER` | `spender === 0x0000...0000` — unusable permit |
+
+These warnings are displayed in `renderHumanReadable()` when present and are tested exhaustively in `tests/permit2.test.ts`.
+
+## Architecture
+
+What is new in `examples/permit2.ts`:
+
+- **`buildPermit2Payload()`** — constructs the EIP-712 typed data, computes the signing hash via `TypedDataEncoder.hash()`, serializes the typed data as JSON → UTF-8 bytes for `sign-data`
+- **`encodeToCbor()`** — local implementation using `data-type: 2` (typed-data), not `1` (transaction)
+- **`decodePermit2Payload()`** — parses JSON from `sign-data` bytes, validates with Zod schema
+- **`decodePermit2UrPayload()`** — full UR → CBOR → JSON → Zod roundtrip
+- **`analyzePermit2()`** — security analysis returning typed `SecurityWarning[]`
+- **`renderHumanReadable()`** — displays all approval fields and any warnings before signing
+
+`encodeToUr()` and `generateQrPayload()` are imported from `eth-transfer.ts` — they operate on CBOR bytes and UR strings and are fully reusable regardless of `data-type`.
