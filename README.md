@@ -689,3 +689,53 @@ The architecture supports adding:
 - **Transaction simulation validation**: add a `simulationResult` field to `validateQrPayload` output, populated by Tenderly/Alchemy before display
 - **Hardware wallet compatibility testing**: pipe corpus cases through the Ledger/Trezor signing SDK and verify they produce transport-layer rejections matching `expectedErrorCode`
 - **Property-based testing**: use `fast-check` with the generators as arbitraries — any payload that passes `validateQrPayload` after mutation is a potential false negative
+
+---
+
+# Specification Companion Docs
+
+Three specification documents in `docs/` provide the engineering rationale behind the implementation decisions in this corpus.
+
+```
+docs/
+  animated-qr-timing.md    Transport timing, fragmentation, reliability
+  ux-recommendations.md    Human-readable rendering, risk communication, UX patterns
+  security-pitfalls.md     Attack surfaces, parser hardening, semantic deception techniques
+```
+
+These documents are written for wallet implementers, security auditors, and protocol integrators. They cover the decisions the EIP-4527 spec leaves to implementations — and the failure modes that emerge when those decisions are made poorly.
+
+## `docs/animated-qr-timing.md`
+
+The animated QR transport layer. Covers:
+
+- **Fragment sizing** — QR version vs. scan distance vs. fragment size tradeoff table (50–300 bytes per fragment)
+- **Frame timing** — recommended durations from 200ms (minimum) to 750ms (accessibility), with rationale for each
+- **Adaptive timing** — algorithm for degrading gracefully when a scan session is taking too long
+- **Fountain code mechanics** — why the first cycle carries the highest information density, and what "seqLen × 2 cycle penalty for 30% frame miss rate" means in practice
+- **DoS considerations** — hard limits on seqLen and CBOR payload size, and why they must be enforced before reconstruction begins
+- **Fragment replay attack mitigations** — `address` field binding, request-id registry, chain-id replay restrictions
+- **Performance reference table** — one-cycle scan time for ETH transfer through contract deployment payloads
+
+## `docs/ux-recommendations.md`
+
+Human-readable rendering and confirmation UX. Covers:
+
+- **Transaction rendering by type** — ETH, ERC20, Permit2, Safe multisig — the minimum required fields for each, and the dangerous anti-patterns that omit them
+- **Warning severity levels** — four levels from informational to hard block, with concrete examples and the appropriate UI response for each
+- **Progressive disclosure** — novice vs. expert mode, hardware wallet pagination requirements
+- **QR scanning flow** — what to show before, during, and after scanning; when to show error UI vs. "stalled" UI
+- **Amount display** — how to render ETH, ERC20, MaxUint256 allowances, and gas; never truncate or round signing amounts
+- **Dangerous anti-patterns** — six concrete failure patterns found in shipped wallets, each with a description of the attack it enables
+
+## `docs/security-pitfalls.md`
+
+Attack surface catalog for EIP-4527 signing. Covers:
+
+- **Transport layer attacks** — truncated UR injection, oversized fragment allocation, frame replay across devices, corrupt checksum bypass
+- **Parse layer attacks** — CBOR integer key confusion, sign-data type confusion, chain ID mismatch between CBOR and RLP, oversized sign-data, deeply nested CBOR
+- **Semantic layer attacks** — approval phishing via ERC20 display, calldata obfuscation via proxy contracts, EIP-712 type shadowing, Safe domain separator manipulation, safeTxHash forgery, Unicode homoglyph spoofing in `origin`, DELEGATECALL disguised as CALL, replay via request-id collision
+- **Parser hardening requirements** — bounds checking table for every numeric field, null vs. missing field semantics, error specificity requirements, no-throw requirement for the parsing path
+- **Supply chain considerations** — BC-UR library integrity, CBOR library attack surface, QR scanner library selection
+
+All attacks listed in `security-pitfalls.md` have corresponding test coverage in `tests/malformed-qr.test.ts` or notes indicating where the defense is enforced in the corpus examples.
