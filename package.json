@@ -9,6 +9,7 @@
     "permit2-example": "tsx examples/permit2.ts",
     "swap-example": "tsx examples/uniswap-swap.ts",
     "multisig-example": "tsx examples/multisig-payload.ts",
+    "malformed-qr-example": "tsx examples/malformed-qr.ts",
     "test": "vitest run"
   },
   "keywords": [],

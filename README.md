@@ -563,3 +563,129 @@ The architecture supports adding:
 - **EIP-4337 UserOperations**: Use `op.callData` as the nested data field, adjust the domain to the EntryPoint address
 - **Permit2 + swap**: Combine a Permit2 `PERMIT` action with an `EXACT_INPUT` command in a single Universal Router multicall
 - **Aggregators**: Extend `KNOWN_ROUTERS` and add a `routerType` discriminant to select the right decoder
+---
+
+# Example 6: Malformed QR Corpus
+
+```bash
+pnpm run malformed-qr-example
+```
+
+Defensive parser reference: intentionally generates 23 malformed payloads across every layer of the QR signing pipeline and demonstrates safe, typed rejection of each. Suitable for use as a reusable wallet security infrastructure corpus.
+
+## Why malformed QR handling matters
+
+QR-based transaction signing moves cryptographic signing off a networked device onto an air-gapped wallet. The QR transport is the trust boundary: anything that can be printed on a QR code can be scanned. A wallet that does not defensively validate every layer of the payload is vulnerable to attacks at each stage of the pipeline:
+
+| Stage | Attack surface | Example |
+|-------|---------------|---------|
+| QR scanner | Partial read | Truncated UR string from low-quality print or partial scan |
+| UR decode | Type confusion | `ur:btc-psbt/...` routed to the Ethereum decoder |
+| UR checksum | Corruption | Bit-flip in transit changes the payload without the user knowing |
+| CBOR structure | Structural injection | CBOR array instead of map — field access silently returns `undefined` |
+| CBOR fields | Missing/null values | `signData = null` — wallet signs an empty hash |
+| Chain ID | Cross-chain replay | `chainId = 0` — transaction unroutable to any network |
+| sign-data bytes | Invalid encoding | Non-UTF-8 bytes crash a naive `TextDecoder` call |
+| EIP-712 schema | Semantic confusion | Missing `primaryType` — struct hash is uncomputable |
+| Safe domain | Replay attack | Extra `name`/`version` fields change the domain separator |
+| Fragment sequence | State machine confusion | Fragment `5 of 3` — seqNum exceeds seqLen |
+| Fragment count | DoS | `seqLen = 10000` — wallet allocates 10 000 fragment slots |
+| Payload size | Memory exhaustion | 4 KB+ UR — unbounded allocation before any field validation |
+
+## How the malformed corpus works
+
+`examples/malformed-qr.ts` exports six deterministic generators and four validators:
+
+**Generators** produce realistic corrupted payloads from a real ETH transfer base:
+- `generateMalformedUr(baseUr, variant)` — 6 UR-level corruptions (truncate, wrong prefix, corrupt body, corrupt checksum, …)
+- `generateMalformedCbor(variant)` — 10 CBOR structural corruptions (wrong type, missing field, null value, invalid chainId, …)
+- `generateTruncatedPayload(input, keepChars)` — arbitrary truncation
+- `generateOversizedPayload()` — UR exceeding `MAX_UR_CHARS` (4096)
+- `generateInvalidFragmentSequence()` — multi-part fragments with impossible/invalid indices
+- `generateCorruptedTypedData(variant)` — 7 EIP-712 schema corruptions
+
+**Validators** return a typed `ValidationResult` discriminated union — they never throw:
+- `validateQrPayload(input)` — top-level entry point; enforces size limit before calling URDecoder
+- `validateUrPayload(urString)` — UR prefix, type, CBOR size
+- `validateCborPayload(cbor)` — CBOR structure, required fields, chainId range, sign-data size
+- `validateTypedData(signData)` — UTF-8 decode, JSON parse, Zod schema, primaryType presence, Safe domain strictness
+- `validateFragmentString(fragment)` — seqNum/seqLen bounds for multi-part URs
+
+## Defensive parsing principles
+
+Every defensive principle is enforced in code and verified by test:
+
+1. **Size limits before parsing** — `input.length > MAX_UR_CHARS` is checked before `URDecoder.decode()` to prevent allocation
+2. **Never throw to caller** — all validators catch internally and return `{ ok: false; error: ClassifiedError }`
+3. **Typed errors, not strings** — six error classes (`MalformedUrError`, `InvalidCborError`, …) each with `recoverable: false`
+4. **Sanitized error rendering** — `renderHumanReadableError` embeds only classifier-controlled messages, never raw bytes from the payload
+5. **Fragment count cap** — `seqLen > MAX_FRAGMENT_COUNT (100)` is rejected before any reconstruction loop
+6. **Strict EIP-712 domain** — `validateTypedData` uses `z.strict()` on the domain schema and adds a SafeTx-specific check for disallowed `name`/`version` fields
+
+## How implementers can reuse the corpus
+
+The 23 corpus cases in `fixtures/malformed-qr.json` are deterministic (no randomness) and self-describing:
+
+```json
+{
+  "id": "cbor_null_sign_data",
+  "kind": "malformed_cbor",
+  "description": "signData field is CBOR null — null-dereference when wallet hashes it",
+  "payload": "a5011006...",
+  "payloadType": "cbor_hex",
+  "expectedErrorCode": "CBOR_MISSING_SIGN_DATA",
+  "humanReadable": "─── QR Payload Validation Failed ───..."
+}
+```
+
+**Fuzzing harness**: feed `corpus[i].payload` to your parser under test, verify it rejects with the `expectedErrorCode` (or any error). A parser that returns `ok: true` for a corpus case has a security bug.
+
+**Differential testing**: run both `validateCborPayload` and your own parser on each `cbor_hex` payload. Any divergence (one accepts, one rejects) is worth investigating.
+
+**Property-based testing**: use the generators as mutation operators. Take a valid transaction, apply a random generator variant, verify the validator rejects.
+
+**CI integration**: `pnpm test` runs the full corpus and all fuzz-style mutation sweeps on every commit.
+
+## Updated folder structure
+
+```
+examples/
+  eth-transfer.ts        # Example 1: native ETH transfer
+  erc20-transfer.ts      # Example 2: ERC20 token transfer
+  permit2.ts             # Example 3: Permit2 EIP-712 approval
+  uniswap-swap.ts        # Example 4: Uniswap V3 exactInputSingle
+  multisig-payload.ts    # Example 5: Safe multisig SafeTx
+  malformed-qr.ts        # Example 6: malformed QR corpus + validators (this example)
+fixtures/
+  eth-transfer.json
+  erc20-transfer.json
+  permit2.json
+  uniswap-swap.json
+  multisig-payload.json
+  malformed-qr.json      # 23 malformed corpus cases with expected error codes
+tests/
+  eth-transfer.test.ts
+  erc20-transfer.test.ts
+  permit2.test.ts
+  uniswap-swap.test.ts
+  multisig-payload.test.ts
+  malformed-qr.test.ts   # 114 tests: all corpus cases, fuzz sweeps, error classes
+```
+
+## Architecture
+
+What is new in `examples/malformed-qr.ts`:
+
+- **Six typed error classes** (`MalformedUrError`, `InvalidCborError`, `InvalidFragmentError`, `OversizedPayloadError`, `InvalidTypedDataError`, `ValidationError`) — each has `code: string`, `recoverable: false`, extends `Error`
+- **`validateQrPayload()`** — never throws; size guard → UR decode → CBOR validate → typed-data validate
+- **`classifyMalformedPayload(error)`** — maps any caught value (typed error class, generic Error, non-Error throw) to a `ClassifiedError` with a `MalformedKind` discriminant
+- **`renderHumanReadableError(classified)`** — structured 8-line rejection notice with error type, code, reason, security notice, and recommended action
+- **`buildMalformedCorpus()`** — generates all 23 cases; each case is validated at build time so the fixture's `humanReadable` field is the actual rendered error, not a template
+
+## Future extensibility
+
+The architecture supports adding:
+- **Animated QR stress testing**: implement a full `URDecoder.receivePart()` harness that delivers the malformed fragment sequences and verifies `isComplete()` never returns `true`
+- **Transaction simulation validation**: add a `simulationResult` field to `validateQrPayload` output, populated by Tenderly/Alchemy before display
+- **Hardware wallet compatibility testing**: pipe corpus cases through the Ledger/Trezor signing SDK and verify they produce transport-layer rejections matching `expectedErrorCode`
+- **Property-based testing**: use `fast-check` with the generators as arbitraries — any payload that passes `validateQrPayload` after mutation is a potential false negative
