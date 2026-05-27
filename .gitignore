@@ -2,8 +2,6 @@
 node_modules/
 jspm_packages/
 
-ethosReferenceWallet/node_modules/
-
 # Logs & Debugging
 *.log
 npm-debug.log*
