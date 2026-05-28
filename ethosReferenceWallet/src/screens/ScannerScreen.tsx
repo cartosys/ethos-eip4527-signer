@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import {
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ethers } from 'ethers';
 import { URDecoder } from '@ngraveio/bc-ur';
@@ -23,7 +24,8 @@ import { ScanReticle } from '../components/ScanReticle';
 import { ErrorView } from '../components/ErrorView';
 import { Colors, Spacing } from '../theme';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
+type Nav   = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
+type Route = RouteProp<RootStackParamList, 'Scanner'>;
 
 const CHAIN_NAMES: Record<number, string> = {
   1:     'ethereum',
@@ -62,6 +64,7 @@ function buildEnvelope(signData: Uint8Array, chainId: number, origin?: string): 
 
 export function ScannerScreen() {
   const navigation = useNavigation<Nav>();
+  const route      = useRoute<Route>();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
 
@@ -105,6 +108,13 @@ export function ScannerScreen() {
       setError(err as { code: string; message: string; recoverable: boolean });
     }
   }, [navigation]);
+
+  // When launched by the Simulator with a pre-set UR, fire it once on mount.
+  // handleFragment is stable (memoized on navigation) so this effect runs exactly once.
+  const initialFragment = route.params?.initialFragment;
+  useEffect(() => {
+    if (initialFragment) handleFragment(initialFragment);
+  }, [handleFragment, initialFragment]);
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
@@ -177,19 +187,12 @@ export function ScannerScreen() {
           Point at an animated QR code from your watch-only wallet
         </Text>
 
-        {/* Dev bypass — inserts a known test UR so we can verify the full pipeline */}
         {__DEV__ && (
           <TouchableOpacity
             style={styles.devBtn}
-            onPress={() => {
-              // Minimal valid EIP-1559 transfer, chain 1, hardhat test accounts
-              // Built via eth-transfer example from the monorepo
-              const TEST_UR =
-                'ur:eth-sign-request/onadtpdagdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdtpcxhdcxvszmlfqdldlpvdhdcxgwbtvagofgsaaeaeaeaeaeaeaeadcsimlyadzcspbkdijkjyjlksjnkkjyjlkpktjkaoaefdfgfefpfefgfpfefgfpfefgfpfefgfpfefgfpfefg';
-              handleFragment(TEST_UR);
-            }}
+            onPress={() => navigation.navigate('Simulator')}
           >
-            <Text style={styles.devBtnText}>⚡ DEV: inject test QR</Text>
+            <Text style={styles.devBtnText}>⚡ DEV MENU</Text>
           </TouchableOpacity>
         )}
       </View>

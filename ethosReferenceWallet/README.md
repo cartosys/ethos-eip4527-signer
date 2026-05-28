@@ -1,97 +1,105 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ethosReferenceWallet
 
-# Getting Started
+A React Native reference implementation of an EIP-4527 hardware-wallet signer. It demonstrates the full air-gap signing pipeline: scan an animated QR code from a watch-only wallet, review and sign the transaction locally, then copy the signed payload back.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## Architecture
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+```
+ScannerScreen
+  └─ react-native-vision-camera (bundled ML Kit barcode model)
+       └─ urDecoder.ts
+            ├─ decodeUrFragment()      bc-ur UR fragment accumulator
+            └─ assembleSignRequest()   CBOR decode → ParsedSignRequest
+                 └─ buildEnvelope()    EIP-1559 fields → display envelope
+                      └─ TxReviewScreen
+                           ├─ deriveWarnings()   security heuristics
+                           ├─ localSigner.ts     ethers.js Wallet.signTransaction()
+                           └─ SigningResultScreen
 ```
 
-## Step 2: Build and run your app
+**Key files**
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+| Path | Role |
+|------|------|
+| `src/screens/ScannerScreen.tsx` | Camera + UR accumulation loop |
+| `src/urDecoder.ts` | bc-ur / CBOR decoding utilities |
+| `src/screens/TxReviewScreen.tsx` | Transaction display, warnings, sign action |
+| `src/localSigner.ts` | Dev-only signing with Hardhat account #0 |
+| `src/screens/SigningResultScreen.tsx` | Signed-tx display and clipboard copy |
+| `src/navigation/AppNavigator.tsx` | React Navigation stack |
+| `src/dev/testScenarios.ts` | Simulator test fixtures |
 
-### Android
+---
 
-```sh
-# Using npm
-npm run android
+## Dev Simulator
 
-# OR using Yarn
-yarn android
+Tap **⚡ DEV MENU** on the Scanner screen to open the Simulator, which runs 5 named scenarios covering every layer of the architecture:
+
+| # | Scenario | Path tested | Expected outcome |
+|---|----------|-------------|-----------------|
+| 1 | ETH Transfer | UR decode → envelope build → TxReview → sign → SigningResult | Green, transfer badge |
+| 2 | ERC20 Transfer (USDC) | Same full pipeline, real fixture UR | Green, contract-call badge |
+| 3 | Uniswap V3 Swap | Same, larger calldata | Green, contract-call badge |
+| 4 | Zero Value (Warning) | Direct to TxReview w/ crafted envelope | Yellow `ZERO_VALUE` warning |
+| 5 | No Recipient (Critical) | Direct to TxReview, no `to` field | Red critical + confirmation modal |
+
+Scenarios 1–3 use real UR strings from `fixtures/` (see `src/dev/testScenarios.ts`) so the full UR decode pipeline is exercised, not bypassed.
+
+**Navigation flow for UR scenarios:**
+
+```
+Simulator ──push('Scanner', { initialFragment })──▶ Scanner (auto-fires handleFragment on mount)
+                                                          └──▶ TxReview ──▶ SigningResult
 ```
 
-### iOS
+**Navigation flow for direct-envelope scenarios:**
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```
+Simulator ──navigate('TxReview', { envelopeJson })──▶ TxReview ──▶ SigningResult
 ```
 
-Then, and every time you update your native dependencies, run:
+---
 
-```sh
-bundle exec pod install
+## Running
+
+### Prerequisites
+
+- Node ≥ 22.11
+- Android emulator with a **Play Store** or **AOSP + Google Services** image, **or** a physical device
+- Metro must be running before launching the app
+
+### Start Metro
+
+```bash
+cd ethosReferenceWallet
+npx react-native start
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### Install and launch
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+```bash
+# separate terminal
+npx react-native run-android
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Or, if the APK is already installed:
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```bash
+adb shell am start -n com.ethosreferencewallet/.MainActivity
+```
 
-## Step 3: Modify your app
+### ADB port forwarding (physical device / non-Play Store emulator)
 
-Now that you have successfully run the app, let's make changes!
+```bash
+adb reverse tcp:8081 tcp:8081
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+---
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Notes
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- **Signing key** — `localSigner.ts` uses Hardhat account #0 (`0xac0974…`). This is a well-known public test key. Never use in production.
+- **Bundled ML Kit** — `android/app/build.gradle` excludes `play-services-mlkit-barcode-scanning` (the unbundled GMS variant that downloads at runtime) and relies solely on `com.google.mlkit:barcode-scanning`, which ships inside the APK. This prevents the *"waiting for barcode module"* hang on emulators without Play Store access.
+- **Monorepo** — the wallet lives inside the `ethos-eip4527-signer` monorepo. Metro watches `../src` (the library source) via `watchFolders` but does not watch the pnpm virtual store, avoiding the Metro hang on startup.

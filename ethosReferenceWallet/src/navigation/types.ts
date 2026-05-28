@@ -1,5 +1,5 @@
 export type RootStackParamList = {
-  Scanner: undefined;
+  Scanner: { initialFragment?: string };
   TxReview: {
     envelopeJson: string;
     signDataHex:  string;
@@ -11,4 +11,5 @@ export type RootStackParamList = {
     signerAddress: string;
     elapsedMs:     number;
   };
+  Simulator: undefined;
 };
