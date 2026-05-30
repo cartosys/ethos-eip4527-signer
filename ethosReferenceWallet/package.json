@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "emulator:webcam": "bash scripts/emulator-webcam.sh",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",

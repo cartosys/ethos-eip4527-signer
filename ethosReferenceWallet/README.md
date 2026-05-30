@@ -45,6 +45,26 @@ Tap **⚡ DEV MENU** on the Scanner screen to open the Simulator, which runs 5 n
 | 4 | Zero Value (Warning) | Direct to TxReview w/ crafted envelope | Yellow `ZERO_VALUE` warning |
 | 5 | No Recipient (Critical) | Direct to TxReview, no `to` field | Red critical + confirmation modal |
 
+
+1. ETH Transfer PASS (green)
+A simple EIP-1559 ETH send. Runs the full pipeline — decodes the UR fragment through the Scanner screen, builds the envelope, lands in TxReview showing a "transfer" badge with no warnings. The happy path
+  baseline.
+  
+2. ERC20 Transfer (USDC) PASS (green)
+A USDC transfer(address, uint256) call. Also full UR pipeline, but the transaction has calldata. TxReview should show a "contract-call" badge instead of "transfer". Verifies the app correctly identifies an ERC20 transfer versus a plain ETH send.
+
+3. Uniswap V3 Swap PASS (green)
+0.5 ETH → USDC via Uniswap's exactInputSingle. Full UR pipeline with more complex calldata. Shows a "contract-call" badge. Tests that complex multicall/swap calldata parses and displays without crashing.
+
+4. Zero Value (Warning) WARN (yellow)
+Skips the QR/UR layer entirely — injects a crafted envelope directly into TxReview. The transaction has value: "0" and no calldata, which is a suspicious combination (sending nothing, doing nothing). Should trigger a ZERO_VALUE medium-severity warning in the review screen.
+
+5. No Recipient (Critical) CRITICAL (red)
+Also a direct envelope injection. The transaction has 1 ETH value but no to address — which means it would deploy a contract or get lost. Should trigger a critical warning and show the confirmation modal that requires explicit user acknowledgment before signing is even possible.
+
+  ---
+Cards 1–3 use the UR DECODE path (go through the scanner and full decode pipeline). Cards 4–5 use the DIRECT path (bypass the scanner, inject straight to TxReview). The bottom legend in the UI explains this distinction.
+
 Scenarios 1–3 use real UR strings from `fixtures/` (see `src/dev/testScenarios.ts`) so the full UR decode pipeline is exercised, not bypassed.
 
 **Navigation flow for UR scenarios:**
@@ -89,6 +109,28 @@ Or, if the APK is already installed:
 ```bash
 adb shell am start -n com.ethosreferencewallet/.MainActivity
 ```
+
+### Scanning real-world QR codes (webcam mode)
+
+By default the emulator uses a virtual scene camera. To point the back camera at your host machine's physical webcam so you can scan real QR codes:
+
+```bash
+# Terminal 1 — start the emulator with the host webcam
+npm run emulator:webcam
+# or directly:
+./scripts/emulator-webcam.sh
+
+# Terminal 2 — Metro
+npx react-native start
+
+# Terminal 3 — install / launch
+npx react-native run-android
+```
+
+`emulator-webcam.sh` accepts an optional camera argument (default `webcam0`).
+If you have multiple webcams use `./scripts/emulator-webcam.sh webcam1`.
+
+> **Note:** The emulator window may show a mirrored or rotated preview. Hold a QR code up to your webcam and point it at the camera viewfinder in the emulator — VisionCamera will decode it the same way it would on a physical device.
 
 ### ADB port forwarding (physical device / non-Play Store emulator)
 
