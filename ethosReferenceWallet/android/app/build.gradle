@@ -108,14 +108,6 @@ android {
     }
 }
 
-// Force the bundled ML Kit barcode model so it ships inside the APK.
-// The GMS unbundled variant (play-services-mlkit-barcode-scanning) tries to
-// download the model at runtime via Play Services, which hangs on emulators
-// and devices that lack Play Store access.
-configurations.all {
-    exclude group: 'com.google.android.gms', module: 'play-services-mlkit-barcode-scanning'
-}
-
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

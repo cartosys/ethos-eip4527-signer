@@ -6,6 +6,8 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
+        // Must be in ext (not gradle.properties) for VisionCamera's safeExtGet() to pick it up
+        VisionCamera_enableCodeScanner = true
     }
     repositories {
         google()
