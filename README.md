@@ -99,6 +99,39 @@ pnpm install
 
 ---
 
+# Dev Account Setup (Sepolia Testnet)
+
+For manual testing against a real testnet — faucet funding, live transaction signing, etc.
+
+**1. Generate a throwaway Sepolia key:**
+
+```bash
+# Using Foundry cast:
+cast wallet new
+
+# Or with tsx (no extra install):
+tsx -e "import { ethers } from 'ethers'; const w = ethers.Wallet.createRandom(); console.log('Key:', w.privateKey); console.log('Address:', w.address);"
+```
+
+**2. Create your `.env` file:**
+
+```bash
+cp .env.example .env
+# Edit .env and set DEV_PRIVATE_KEY to your new key
+```
+
+**3. Check your balance:**
+
+```bash
+pnpm check-dev-balance
+```
+
+If the balance is zero the script prints faucet links. Fund the address, then re-run to confirm.
+
+> **Warning:** This key is for Sepolia testnet only. Never reuse it on mainnet. Never commit `.env`.
+
+---
+
 # Commands
 
 ```bash

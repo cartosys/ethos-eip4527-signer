@@ -18,8 +18,9 @@ export interface SigningResult {
   elapsedMs: number;
 }
 
-// DEV ONLY — Hardhat well-known account #0. Public test key, never use in production.
-const DEV_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+// DEV ONLY — prefers DEV_PRIVATE_KEY env var; falls back to Hardhat account #0 for local-node testing.
+const HARDHAT_FALLBACK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+const DEV_PRIVATE_KEY = process.env.DEV_PRIVATE_KEY ?? HARDHAT_FALLBACK;
 
 export async function signLocally(tx: LocalSignerInput): Promise<SigningResult> {
   const start = Date.now();

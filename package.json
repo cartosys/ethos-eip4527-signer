@@ -10,7 +10,8 @@
     "swap-example": "tsx examples/uniswap-swap.ts",
     "multisig-example": "tsx examples/multisig-payload.ts",
     "malformed-qr-example": "tsx examples/malformed-qr.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check-dev-balance": "tsx --env-file=.env scripts/check-dev-balance.ts"
   },
   "keywords": [],
   "author": "",
