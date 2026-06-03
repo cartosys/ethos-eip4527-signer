@@ -67,6 +67,9 @@ until [ "$("$ADB" -s "$SERIAL" shell getprop init.svc.bootanim 2>/dev/null | tr 
 done
 echo "[dev] Boot complete."
 
+# Forward Metro port so the emulator can reach the host bundler
+"$ADB" -s "$SERIAL" reverse tcp:8081 tcp:8081
+
 # Pre-grant camera so the scanner opens straight to the live webcam feed
 "$ADB" -s "$SERIAL" shell pm grant "$APP_PACKAGE" android.permission.CAMERA 2>/dev/null || true
 
