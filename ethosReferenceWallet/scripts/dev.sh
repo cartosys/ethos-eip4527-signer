@@ -41,7 +41,7 @@ cd "$ROOT"
 
 # Metro and emulator start in parallel — no dependency between them
 echo "[dev] Starting Metro…"
-npx react-native start &
+npx react-native start --reset-cache &
 METRO_PID=$!
 
 echo "[dev] Starting $AVD with back camera = $CAMERA …"
