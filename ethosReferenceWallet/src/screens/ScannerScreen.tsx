@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {
   Camera,
@@ -34,6 +38,33 @@ const CHAIN_NAMES: Record<number, string> = {
   8453:  'base',
   137:   'polygon',
 };
+
+function hexToNum(v: unknown): number | undefined {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = v.startsWith('0x') ? parseInt(v, 16) : parseInt(v, 10);
+    return isNaN(n) ? undefined : n;
+  }
+  return undefined;
+}
+
+function normalizeRawTx(raw: Record<string, unknown>): Record<string, unknown> {
+  const chainId = hexToNum(raw.chainId) ?? 1;
+  return {
+    chain:                CHAIN_NAMES[chainId] ?? 'ethereum',
+    chainId,
+    to:                   raw.to,
+    from:                 raw.from,
+    value:                raw.value,
+    nonce:                hexToNum(raw.nonce),
+    gasLimit:             raw.gasLimit,
+    // EIP-1559 fields; fall back to legacy gasPrice for pre-EIP-1559 objects
+    maxFeePerGas:         raw.maxFeePerGas ?? raw.gasPrice,
+    maxPriorityFeePerGas: raw.maxPriorityFeePerGas,
+    data:                 raw.data,
+    type:                 'eip1559' as const,
+  };
+}
 
 function buildEnvelope(signData: Uint8Array, chainId: number, origin?: string): Record<string, unknown> {
   try {
@@ -74,6 +105,10 @@ export function ScannerScreen() {
 
   const [fragmentCount, setFragmentCount] = useState(0);
   const [error, setError] = useState<{ code: string; message: string; recoverable: boolean } | null>(null);
+  const [lastRaw, setLastRaw] = useState<string | null>(null);
+  const [urInputVisible, setUrInputVisible] = useState(false);
+  const [urInputText, setUrInputText] = useState('');
+  const [urInputError, setUrInputError] = useState<string | null>(null);
 
   const resetScanner = useCallback(() => {
     decoderRef.current = newUrDecoder();
@@ -81,9 +116,14 @@ export function ScannerScreen() {
     processingRef.current = false;
     setFragmentCount(0);
     setError(null);
+    setLastRaw(null);
+    setUrInputText('');
+    setUrInputError(null);
+    setUrInputVisible(false);
   }, []);
 
   const handleFragment = useCallback((fragment: string) => {
+    if (__DEV__) setLastRaw(fragment.slice(0, 60));
     if (processingRef.current) return;
     if (seenRef.current.has(fragment)) return;
     seenRef.current.add(fragment);
@@ -108,6 +148,42 @@ export function ScannerScreen() {
       setError(err as { code: string; message: string; recoverable: boolean });
     }
   }, [navigation]);
+
+  const submitUrInput = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setUrInputError('Nothing pasted — enter a JSON object or ur: string.');
+      return;
+    }
+
+    if (trimmed.startsWith('{')) {
+      let raw: Record<string, unknown>;
+      try {
+        raw = JSON.parse(trimmed) as Record<string, unknown>;
+      } catch (e) {
+        setUrInputError('Invalid JSON: ' + (e instanceof Error ? e.message : 'parse error'));
+        return;
+      }
+      const envelope = normalizeRawTx(raw);
+      setUrInputError(null);
+      setUrInputVisible(false);
+      navigation.navigate('TxReview', {
+        envelopeJson: JSON.stringify(envelope),
+        signDataHex:  '0x(manual)',
+        requestIdHex: '0x',
+      });
+      return;
+    }
+
+    if (trimmed.toLowerCase().startsWith('ur:')) {
+      setUrInputError(null);
+      setUrInputVisible(false);
+      handleFragment(trimmed);
+      return;
+    }
+
+    setUrInputError('Must start with { (JSON) or ur: (UR fragment).');
+  }, [navigation, handleFragment]);
 
   // When launched by the Simulator with a pre-set UR, fire it once on mount.
   // handleFragment is stable (memoized on navigation) so this effect runs exactly once.
@@ -161,6 +237,7 @@ export function ScannerScreen() {
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={true}
+        pixelFormat="yuv"
         codeScanner={codeScanner}
       />
 
@@ -188,14 +265,78 @@ export function ScannerScreen() {
         </Text>
 
         {__DEV__ && (
-          <TouchableOpacity
-            style={styles.devBtn}
-            onPress={() => navigation.navigate('Simulator')}
-          >
-            <Text style={styles.devBtnText}>⚡ DEV MENU</Text>
-          </TouchableOpacity>
+          <>
+            {lastRaw !== null ? (
+              <Text style={styles.devScan}>
+                SCAN: {lastRaw.startsWith('ur:') ? '✓ UR' : '✗ NOT UR'} — {lastRaw}
+              </Text>
+            ) : (
+              <Text style={styles.devScan}>SCAN: waiting… (camera not delivering frames)</Text>
+            )}
+            <View style={styles.devRow}>
+              <TouchableOpacity
+                style={styles.devBtn}
+                onPress={() => navigation.navigate('Simulator')}
+              >
+                <Text style={styles.devBtnText}>⚡ DEV MENU</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.devBtn, styles.devBtnCyan]}
+                onPress={() => { setUrInputText(''); setUrInputError(null); setUrInputVisible(true); }}
+              >
+                <Text style={[styles.devBtnText, styles.devBtnTextCyan]}>PASTE UR</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </View>
+      {__DEV__ && (
+        <Modal
+          visible={urInputVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setUrInputVisible(false)}
+        >
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>PASTE UR / JSON</Text>
+              <Text style={styles.modalSub}>
+                Paste a ur:eth-sign-request/… string, or a raw JSON transaction object
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                value={urInputText}
+                onChangeText={t => { setUrInputText(t); setUrInputError(null); }}
+                placeholder="ur:eth-sign-request/… or { … } JSON"
+                placeholderTextColor={Colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+              />
+              {urInputError !== null && (
+                <Text style={styles.modalError}>{urInputError}</Text>
+              )}
+              <View style={styles.modalRow}>
+                <TouchableOpacity
+                  style={styles.modalBtnCancel}
+                  onPress={() => setUrInputVisible(false)}
+                >
+                  <Text style={styles.modalBtnCancelText}>CANCEL</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalBtnSubmit}
+                  onPress={() => submitUrInput(urInputText)}
+                >
+                  <Text style={styles.modalBtnSubmitText}>SUBMIT</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -291,17 +432,109 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 14,
   },
-  devBtn: {
+  devScan: {
+    marginTop: Spacing.sm,
+    fontSize: 10,
+    color: Colors.neonCyan,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  devRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
     marginTop: Spacing.md,
+  },
+  devBtn: {
     borderWidth: 1,
     borderColor: Colors.neonMagenta,
     borderRadius: 6,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
   },
+  devBtnCyan: {
+    borderColor: Colors.neonCyan,
+  },
   devBtnText: {
     color: Colors.neonMagenta,
     fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  devBtnTextCyan: {
+    color: Colors.neonCyan,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  modalBox: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderGlow,
+    padding: Spacing.lg,
+  },
+  modalTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.neonCyan,
+    letterSpacing: 2,
+    marginBottom: Spacing.xs,
+  },
+  modalSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    lineHeight: 16,
+  },
+  modalInput: {
+    backgroundColor: Colors.bgDeep,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderGlow,
+    color: Colors.textPrimary,
+    fontSize: 11,
+    fontFamily: 'monospace',
+    padding: Spacing.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginBottom: Spacing.md,
+  },
+  modalError: {
+    fontSize: 11,
+    color: Colors.critical,
+    marginBottom: Spacing.sm,
+    lineHeight: 16,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+  },
+  modalBtnCancel: {
+    borderWidth: 1,
+    borderColor: Colors.textSecondary,
+    borderRadius: 6,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+  },
+  modalBtnCancelText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  modalBtnSubmit: {
+    backgroundColor: Colors.neonCyan,
+    borderRadius: 6,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+  },
+  modalBtnSubmitText: {
+    color: Colors.bgDeep,
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
 });
