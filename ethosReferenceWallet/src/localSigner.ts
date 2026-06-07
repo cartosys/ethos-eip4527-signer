@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { DEV_PRIVATE_KEY as ENV_PRIVATE_KEY } from '@env';
 
 export interface LocalSignerInput {
   to?: string;
@@ -18,9 +19,9 @@ export interface SigningResult {
   elapsedMs: number;
 }
 
-// DEV ONLY — prefers DEV_PRIVATE_KEY env var; falls back to Hardhat account #0 for local-node testing.
+// DEV ONLY — reads DEV_PRIVATE_KEY from .env via react-native-dotenv; falls back to Hardhat account #0.
 const HARDHAT_FALLBACK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-const DEV_PRIVATE_KEY = process.env.DEV_PRIVATE_KEY ?? HARDHAT_FALLBACK;
+const DEV_PRIVATE_KEY = ENV_PRIVATE_KEY ?? HARDHAT_FALLBACK;
 
 export async function signLocally(tx: LocalSignerInput): Promise<SigningResult> {
   const start = Date.now();
