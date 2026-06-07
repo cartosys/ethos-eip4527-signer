@@ -15,6 +15,11 @@ const config = {
     nodeModulesPaths: [
       path.resolve(projectRoot, 'node_modules'),
     ],
+    // @env is a virtual module emitted by react-native-dotenv's Babel plugin.
+    // Without this, Metro tries to resolve it from disk and fails.
+    extraNodeModules: {
+      '@env': path.resolve(projectRoot, 'node_modules/react-native-dotenv'),
+    },
   },
 };
 
