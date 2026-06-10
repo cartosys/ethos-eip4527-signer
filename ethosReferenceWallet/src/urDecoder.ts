@@ -43,14 +43,31 @@ interface RawPart {
   fragment: Buffer;
 }
 
+const BYTEWORDS_STYLES_TRY_ORDER = [
+  bytewords.STYLES.MINIMAL,
+  bytewords.STYLES.URI,
+  bytewords.STYLES.STANDARD,
+] as const;
+
 function extractRawPart(fragment: string): RawPart | null {
   try {
     const [, components] = URDecoder.parse(fragment);
     if (components.length !== 2) return null;
     const [seq, payload] = components;
     const [urlSeqNum, urlSeqLen] = URDecoder.parseSequenceComponent(seq);
-    const cbor = bytewords.decode(payload, bytewords.STYLES.MINIMAL);
-    const part = FountainEncoderPart.fromCBOR(cbor);
+
+    let part: FountainEncoderPart | null = null;
+    for (const style of BYTEWORDS_STYLES_TRY_ORDER) {
+      try {
+        const cbor = bytewords.decode(payload, style);
+        part = FountainEncoderPart.fromCBOR(cbor);
+        break;
+      } catch {
+        // try next style
+      }
+    }
+    if (!part) return null;
+
     if (urlSeqNum !== part.seqNum || urlSeqLen !== part.seqLength) return null;
     return {
       seqNum:   part.seqNum,
@@ -194,8 +211,21 @@ export function diagFragment(fragment: string): FragmentDiag | null {
     if (components.length !== 2) return null;
     const [seq, payload] = components;
     const [urlSeqNum, urlSeqLen] = URDecoder.parseSequenceComponent(seq);
-    const cbor = bytewords.decode(payload, bytewords.STYLES.MINIMAL);
-    const part = FountainEncoderPart.fromCBOR(cbor);
+
+    let part: FountainEncoderPart | null = null;
+    let detectedStyle = 'unknown';
+    for (const style of BYTEWORDS_STYLES_TRY_ORDER) {
+      try {
+        const cbor = bytewords.decode(payload, style);
+        part = FountainEncoderPart.fromCBOR(cbor);
+        detectedStyle = style;
+        break;
+      } catch {
+        // try next style
+      }
+    }
+    if (!part) return { urlSeqNum, urlSeqLen, cborSeqNum: -1, cborSeqLen: -1, cborMsgLen: -1, fragByteLen: -1, error: 'all bytewords styles failed' };
+
     return {
       urlSeqNum,
       urlSeqLen,
@@ -203,6 +233,7 @@ export function diagFragment(fragment: string): FragmentDiag | null {
       cborSeqLen:  part.seqLength,
       cborMsgLen:  part.messageLength,
       fragByteLen: part.fragment.length,
+      error:       detectedStyle !== bytewords.STYLES.MINIMAL ? `style=${detectedStyle}` : undefined,
     };
   } catch (e) {
     return { urlSeqNum: -1, urlSeqLen: -1, cborSeqNum: -1, cborSeqLen: -1, cborMsgLen: -1, fragByteLen: -1, error: String(e) };
