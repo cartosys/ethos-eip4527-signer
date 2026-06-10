@@ -17,16 +17,16 @@ import {
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ethers } from 'ethers';
 import { URDecoder } from '@ngraveio/bc-ur';
 import type { RootStackParamList } from '../navigation/types';
-import { newUrDecoder, decodeUrFragment, assembleSignRequest, toHex } from '../urDecoder';
+import { newUrDecoder, decodeUrFragment, assembleSignRequest, assembleSignRequestFromBuffer, toHex, diagFragment, MultipartUrDecoder } from '../urDecoder';
 import { ScanReticle } from '../components/ScanReticle';
 import { ErrorView } from '../components/ErrorView';
-import { Colors, Spacing } from '../theme';
+import { Colors, Spacing, FontFamily } from '../theme';
 
 type Nav   = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 type Route = RouteProp<RootStackParamList, 'Scanner'>;
@@ -99,20 +99,21 @@ export function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
 
-  const decoderRef  = useRef<URDecoder>(newUrDecoder());
-  const seenRef     = useRef(new Set<string>());
+  const decoderRef    = useRef<URDecoder>(newUrDecoder());
+  const mpDecoderRef  = useRef(new MultipartUrDecoder());
   const processingRef = useRef(false);
 
   const [fragmentCount, setFragmentCount] = useState(0);
   const [error, setError] = useState<{ code: string; message: string; recoverable: boolean } | null>(null);
   const [lastRaw, setLastRaw] = useState<string | null>(null);
+  const [decodeDebug, setDecodeDebug] = useState<string | null>(null);
   const [urInputVisible, setUrInputVisible] = useState(false);
   const [urInputText, setUrInputText] = useState('');
   const [urInputError, setUrInputError] = useState<string | null>(null);
 
   const resetScanner = useCallback(() => {
-    decoderRef.current = newUrDecoder();
-    seenRef.current.clear();
+    decoderRef.current   = newUrDecoder();
+    mpDecoderRef.current = new MultipartUrDecoder();
     processingRef.current = false;
     setFragmentCount(0);
     setError(null);
@@ -122,21 +123,57 @@ export function ScannerScreen() {
     setUrInputVisible(false);
   }, []);
 
+  // On returning from TxReview: reset the decoder and processing state so the
+  // camera can re-scan. Also clears the stale percent/frame counter.
+  useFocusEffect(
+    useCallback(() => {
+      decoderRef.current   = newUrDecoder();
+      mpDecoderRef.current = new MultipartUrDecoder();
+      processingRef.current = false;
+      setFragmentCount(0);
+      setDecodeDebug(null);
+    }, [])
+  );
+
   const handleFragment = useCallback((fragment: string) => {
     if (__DEV__) setLastRaw(fragment.slice(0, 60));
     if (processingRef.current) return;
-    if (seenRef.current.has(fragment)) return;
-    seenRef.current.add(fragment);
 
-    const complete = decodeUrFragment(decoderRef.current, fragment);
-    setFragmentCount(seenRef.current.size);
+    const { ok: decOk, error: decErr } = decodeUrFragment(decoderRef.current, fragment);
+    const complete = decoderRef.current.isComplete();
+    if (__DEV__) {
+      const exp  = decoderRef.current.expectedPartCount();
+      const pct  = Math.round(decoderRef.current.estimatedPercentComplete() * 100);
+      const recv = JSON.stringify(decoderRef.current.receivedPartIndexes());
+      const last = JSON.stringify(decoderRef.current.lastPartIndexes());
+      const err  = decoderRef.current.isError() ? decoderRef.current.resultError() : 'no';
+      const diag = diagFragment(fragment);
+      const dbg  = `ok=${decOk} exp=${exp} recv=${recv} last=${last} ${pct}% done=${complete} err=${err}${decErr ? ' FRAG:' + decErr.slice(0, 28) : ''}\n  diag: url=${diag?.urlSeqNum}/${diag?.urlSeqLen} cbor=${diag?.cborSeqNum}/${diag?.cborSeqLen} msgLen=${diag?.cborMsgLen} fragLen=${diag?.fragByteLen}${diag?.error ? ' diagErr:'+diag.error.slice(0,40) : ''}`;
+      console.log('[Scanner] decode:', dbg);
+      setDecodeDebug(dbg);
+    }
+    if (decOk) setFragmentCount(c => c + 1);
 
-    if (!complete && !decoderRef.current.isComplete()) return;
+    // Also feed the manual decoder (handles wallets that omit last-fragment padding).
+    const mpOk = mpDecoderRef.current.receivePart(fragment);
+    if (mpOk) setFragmentCount(c => c + 1);
+
+    const libraryDone  = complete === true;
+    const manualDone   = mpDecoderRef.current.isComplete();
+    if (!libraryDone && !manualDone) return;
 
     processingRef.current = true;
     try {
-      const parsed = assembleSignRequest(decoderRef.current);
+      let parsed;
+      if (libraryDone) {
+        parsed = assembleSignRequest(decoderRef.current);
+      } else {
+        const message = mpDecoderRef.current.assemble();
+        if (!message) throw { code: 'UR_INVALID', message: 'CRC mismatch after manual assembly', recoverable: false };
+        parsed = assembleSignRequestFromBuffer(message);
+      }
       const envelope = buildEnvelope(parsed.signData, parsed.chainId, parsed.origin);
+      if (__DEV__) console.log('[Scanner] UR complete — navigating to TxReview', envelope);
       navigation.navigate('TxReview', {
         envelopeJson: JSON.stringify(envelope),
         signDataHex:  toHex(parsed.signData),
@@ -145,7 +182,11 @@ export function ScannerScreen() {
       });
     } catch (err) {
       processingRef.current = false;
-      setError(err as { code: string; message: string; recoverable: boolean });
+      const shaped = (err != null && typeof err === 'object' && 'code' in err)
+        ? err as { code: string; message: string; recoverable: boolean }
+        : { code: 'ASSEMBLY_FAILED', message: String(err), recoverable: false };
+      if (__DEV__) console.warn('[Scanner] assembly failed', shaped);
+      setError(shaped);
     }
   }, [navigation]);
 
@@ -253,8 +294,14 @@ export function ScannerScreen() {
       {/* Reticle */}
       <View style={styles.reticleWrap}>
         <ScanReticle />
-        {fragmentCount > 1 && (
-          <Text style={styles.fragmentCount}>{fragmentCount} frames</Text>
+        {fragmentCount > 0 && (
+          <Text style={styles.fragmentCount}>
+            {Math.round(decoderRef.current.estimatedPercentComplete() * 100)}%
+            {fragmentCount > 1 ? ` · ${fragmentCount} frames` : ''}
+          </Text>
+        )}
+        {__DEV__ && decodeDebug !== null && (
+          <Text style={styles.decodeDebug}>{decodeDebug}</Text>
         )}
       </View>
 
@@ -388,6 +435,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.neonCyan,
     letterSpacing: 1,
+  },
+  decodeDebug: {
+    marginTop: 4,
+    fontSize: 10,
+    color: Colors.neonMagenta,
+    letterSpacing: 0.5,
+    fontFamily: FontFamily.mono,
   },
   footer: {
     position: 'absolute',
