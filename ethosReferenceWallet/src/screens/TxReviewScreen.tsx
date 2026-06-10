@@ -32,10 +32,21 @@ function deriveActionType(data?: string): 'transfer' | 'contract-call' | 'unknow
   return 'contract-call';
 }
 
+function isZeroOrMissing(v: unknown): boolean {
+  if (v == null || v === '' || v === '0x') return true;
+  try { return BigInt(v as string) === 0n; } catch { return true; }
+}
+
 function deriveWarnings(envelope: Record<string, unknown>): Warning[] {
   const warnings: Warning[] = [];
   if (!envelope.to) {
     warnings.push({ severity: 'critical', code: 'NO_RECIPIENT', message: 'No recipient address — contract deploy or malformed transaction.' });
+  }
+  if (isZeroOrMissing(envelope.maxFeePerGas)) {
+    warnings.push({ severity: 'critical', code: 'ZERO_MAX_FEE', message: 'maxFeePerGas is zero or missing — network will reject this transaction as underpriced.' });
+  }
+  if (isZeroOrMissing(envelope.maxPriorityFeePerGas)) {
+    warnings.push({ severity: 'high', code: 'ZERO_PRIORITY_FEE', message: 'maxPriorityFeePerGas is zero — validators are unlikely to include this transaction.' });
   }
   if (envelope.value === '0' || envelope.value === undefined) {
     if (!envelope.data || envelope.data === '0x') {
