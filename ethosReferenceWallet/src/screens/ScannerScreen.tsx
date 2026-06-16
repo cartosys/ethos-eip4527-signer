@@ -139,6 +139,24 @@ export function ScannerScreen() {
     if (__DEV__) setLastRaw(fragment.slice(0, 60));
     if (processingRef.current) return;
 
+    // If either decoder was seeded from a different QR sequence (different seqLen),
+    // reset both so the correct sequence can initialize fresh.
+    try {
+      const [, comps] = URDecoder.parse(fragment);
+      if (comps.length === 2) {
+        const [, fragSeqLen] = URDecoder.parseSequenceComponent(comps[0]);
+        const libExp = decoderRef.current.expectedPartCount();
+        const mpLen  = mpDecoderRef.current.totalCount;
+        if ((libExp > 0 && libExp !== fragSeqLen) || (mpLen > 0 && mpLen !== fragSeqLen)) {
+          decoderRef.current   = newUrDecoder();
+          mpDecoderRef.current = new MultipartUrDecoder();
+          setFragmentCount(0);
+        }
+      }
+    } catch {
+      // Non-UR or single-part fragment; let normal decode path handle it.
+    }
+
     const { ok: decOk, error: decErr } = decodeUrFragment(decoderRef.current, fragment);
     const complete = decoderRef.current.isComplete();
     if (__DEV__) {
@@ -296,7 +314,9 @@ export function ScannerScreen() {
         <ScanReticle />
         {fragmentCount > 0 && (
           <Text style={styles.fragmentCount}>
-            {Math.round(decoderRef.current.estimatedPercentComplete() * 100)}%
+            {mpDecoderRef.current.totalCount > 0
+              ? Math.round(100 * mpDecoderRef.current.receivedCount / mpDecoderRef.current.totalCount)
+              : Math.round(decoderRef.current.estimatedPercentComplete() * 100)}%
             {fragmentCount > 1 ? ` · ${fragmentCount} frames` : ''}
           </Text>
         )}
