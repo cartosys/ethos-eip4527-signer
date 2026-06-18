@@ -10,6 +10,8 @@ export type RootStackParamList = {
     signedTx:      string;
     signerAddress: string;
     elapsedMs:     number;
+    requestIdHex:  string;
+    origin?:       string;
   };
   Simulator: undefined;
 };

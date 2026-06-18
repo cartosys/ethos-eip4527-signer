@@ -17,7 +17,7 @@ import {
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ethers } from 'ethers';
@@ -98,6 +98,7 @@ export function ScannerScreen() {
   const route      = useRoute<Route>();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
+  const isFocused = useIsFocused();
 
   const decoderRef    = useRef<URDecoder>(newUrDecoder());
   const mpDecoderRef  = useRef(new MultipartUrDecoder());
@@ -295,7 +296,7 @@ export function ScannerScreen() {
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={true}
+        isActive={isFocused}
         pixelFormat="yuv"
         codeScanner={codeScanner}
       />

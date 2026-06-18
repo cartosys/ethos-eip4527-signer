@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import QRCode from 'react-native-qrcode-svg';
 import type { RootStackParamList } from '../navigation/types';
+import { encodeSignatureResponse } from '../urEncoder';
 import { Colors, Spacing, FontFamily } from '../theme';
 
 type Nav   = NativeStackNavigationProp<RootStackParamList, 'SigningResult'>;
@@ -23,14 +25,25 @@ function truncateTx(tx: string): string {
   return `${tx.slice(0, 10)}…${tx.slice(-8)}`;
 }
 
+// DEV: render the raw signed tx as the QR payload instead of the EIP-4527 UR.
+// Flip to false to restore the UR-encoded QR once a counterpart scanner needs it.
+const QR_PLAIN_TEXT_DEV = true;
+
 export function SigningResultScreen() {
   const navigation = useNavigation<Nav>();
   const route      = useRoute<Route>();
-  const { signedTx, signerAddress, elapsedMs } = route.params;
+  const { signedTx, signerAddress, elapsedMs, requestIdHex, origin } = route.params;
 
   const scaleAnim   = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [copied, setCopied] = React.useState(false);
+
+  const qrValue = useMemo(
+    () => QR_PLAIN_TEXT_DEV
+      ? signedTx
+      : encodeSignatureResponse(requestIdHex, signedTx, origin),
+    [requestIdHex, signedTx, origin],
+  );
 
   useEffect(() => {
     Animated.sequence([
@@ -65,6 +78,16 @@ export function SigningResultScreen() {
           <Text style={styles.title}>TRANSACTION SIGNED</Text>
           <Text style={styles.subtitle}>Signature produced successfully</Text>
 
+          <View style={styles.qrContainer}>
+            <QRCode
+              value={qrValue}
+              size={200}
+              color={Colors.bgDeep}
+              backgroundColor={Colors.neonCyan}
+              quietZone={16}
+            />
+          </View>
+
           <View style={styles.card}>
             <Text style={styles.fieldLabel}>SIGNED TX</Text>
             <Text style={styles.txHash} numberOfLines={2}>{truncateTx(signedTx)}</Text>
@@ -80,15 +103,17 @@ export function SigningResultScreen() {
             <Text style={styles.mono}>{elapsedMs} ms</Text>
           </View>
 
-          <TouchableOpacity style={styles.btnCopy} onPress={handleCopy}>
-            <Text style={styles.btnCopyText}>
-              {copied ? '✓ COPIED' : 'COPY SIGNED TX'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.btnRow}>
+            <TouchableOpacity style={[styles.btnCopy, styles.btnHalf]} onPress={handleCopy}>
+              <Text style={styles.btnCopyText}>
+                {copied ? '✓ COPIED' : 'COPY SIGNED TX'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.btnScanAnother} onPress={handleScanAnother}>
-            <Text style={styles.btnScanAnotherText}>SCAN ANOTHER</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.btnScanAnother, styles.btnHalf]} onPress={handleScanAnother}>
+              <Text style={styles.btnScanAnotherText}>SCAN ANOTHER</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.devNote}>
             ⚠ DEV MODE — signed with Hardhat test key #{'\n'}
@@ -147,6 +172,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
+  qrContainer: {
+    backgroundColor: Colors.bgDeep,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+  },
   card: {
     width: '100%',
     backgroundColor: Colors.bgCard,
@@ -155,6 +186,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderGlow,
     padding: Spacing.md,
     marginBottom: Spacing.md,
+    alignItems: 'center',
   },
   fieldLabel: {
     fontSize: 10,
@@ -162,31 +194,43 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: Spacing.xs,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   txHash: {
     fontFamily: FontFamily.mono,
     fontSize: 13,
     color: Colors.textMono,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   mono: {
     fontFamily: FontFamily.mono,
     fontSize: 12,
     color: Colors.textMono,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   divider: {
     height: 1,
     backgroundColor: Colors.borderGlow,
     marginVertical: Spacing.sm,
   },
-  btnCopy: {
+  btnRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
     width: '100%',
+    marginBottom: Spacing.xl,
+  },
+  btnHalf: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  btnCopy: {
     backgroundColor: Colors.neonCyan,
     borderRadius: 8,
     paddingVertical: Spacing.md,
     alignItems: 'center',
-    marginBottom: Spacing.sm,
   },
   btnCopyText: {
     color: Colors.bgDeep,
@@ -194,13 +238,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   btnScanAnother: {
-    width: '100%',
     borderWidth: 1,
     borderColor: Colors.borderGlow,
     borderRadius: 8,
     paddingVertical: Spacing.md,
     alignItems: 'center',
-    marginBottom: Spacing.xl,
   },
   btnScanAnotherText: {
     color: Colors.textSecondary,

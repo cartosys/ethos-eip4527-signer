@@ -94,7 +94,7 @@ const fieldStyles = StyleSheet.create({
 export function TxReviewScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { envelopeJson, signDataHex, origin } = route.params;
+  const { envelopeJson, signDataHex, requestIdHex, origin } = route.params;
 
   const envelope = useMemo<Record<string, unknown>>(() => {
     try { return JSON.parse(envelopeJson) as Record<string, unknown>; }
@@ -127,6 +127,8 @@ export function TxReviewScreen() {
         signedTx:      result.signedTx,
         signerAddress: result.signerAddress,
         elapsedMs:     result.elapsedMs,
+        requestIdHex,
+        origin,
       });
     } catch (err) {
       setSigning(false);
