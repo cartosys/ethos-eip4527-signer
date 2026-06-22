@@ -7,6 +7,8 @@ import { ScannerScreen } from '../screens/ScannerScreen';
 import { TxReviewScreen } from '../screens/TxReviewScreen';
 import { SigningResultScreen } from '../screens/SigningResultScreen';
 import { SimulatorScreen } from '../screens/SimulatorScreen';
+import { AccountsListScreen } from '../screens/AccountsListScreen';
+import { AccountFormScreen } from '../screens/AccountFormScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -28,6 +30,8 @@ export function AppNavigator() {
           options={{ gestureEnabled: false }}
         />
         <Stack.Screen name="Simulator"     component={SimulatorScreen} />
+        <Stack.Screen name="Accounts"      component={AccountsListScreen} />
+        <Stack.Screen name="AccountForm"   component={AccountFormScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

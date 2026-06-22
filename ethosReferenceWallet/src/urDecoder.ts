@@ -10,6 +10,7 @@ export interface ParsedSignRequest {
   chainId: number;
   origin?: string;
   dataType: number;
+  address?: string;
 }
 
 export function newUrDecoder(): URDecoder {
@@ -157,12 +158,20 @@ function parseCborMessage(cbor: Uint8Array): ParsedSignRequest {
     ? new Uint8Array(rawRequestId as ArrayBuffer)
     : new Uint8Array(0);
 
+  // Key 6 is the optional `address` field of the eth-sign-request spec — the
+  // account the request is asking the wallet to sign with.
+  const rawAddress = get(6);
+  const address = rawAddress != null
+    ? toHex(new Uint8Array(rawAddress as ArrayBuffer))
+    : undefined;
+
   return {
     requestId,
     signData,
     dataType: (get(3) as number | undefined) ?? 1,
     chainId:  (get(4) as number | undefined) ?? 1,
     origin:   get(7) as string | undefined,
+    address,
   };
 }
 

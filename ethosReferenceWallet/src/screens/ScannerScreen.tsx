@@ -66,13 +66,14 @@ function normalizeRawTx(raw: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-function buildEnvelope(signData: Uint8Array, chainId: number, origin?: string): Record<string, unknown> {
+function buildEnvelope(signData: Uint8Array, chainId: number, origin?: string, fromAddress?: string): Record<string, unknown> {
   try {
     const hex = toHex(signData);
     const parsed = ethers.Transaction.from(hex);
     return {
       chain:                CHAIN_NAMES[chainId] ?? 'ethereum',
       to:                   parsed.to ?? undefined,
+      from:                 fromAddress,
       value:                parsed.value?.toString(),
       nonce:                parsed.nonce,
       gasLimit:             parsed.gasLimit?.toString(),
@@ -87,6 +88,7 @@ function buildEnvelope(signData: Uint8Array, chainId: number, origin?: string): 
     return {
       chain:   CHAIN_NAMES[chainId] ?? 'ethereum',
       chainId: chainId,
+      from:    fromAddress,
       type:    'eip1559' as const,
       metadata: origin ? { origin } : undefined,
     };
@@ -191,7 +193,7 @@ export function ScannerScreen() {
         if (!message) throw { code: 'UR_INVALID', message: 'CRC mismatch after manual assembly', recoverable: false };
         parsed = assembleSignRequestFromBuffer(message);
       }
-      const envelope = buildEnvelope(parsed.signData, parsed.chainId, parsed.origin);
+      const envelope = buildEnvelope(parsed.signData, parsed.chainId, parsed.origin, parsed.address);
       if (__DEV__) console.log('[Scanner] UR complete — navigating to TxReview', envelope);
       navigation.navigate('TxReview', {
         envelopeJson: JSON.stringify(envelope),
@@ -347,6 +349,12 @@ export function ScannerScreen() {
                 onPress={() => navigation.navigate('Simulator')}
               >
                 <Text style={styles.devBtnText}>⚡ DEV MENU</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.devBtn, styles.devBtnGreen]}
+                onPress={() => navigation.navigate('Accounts')}
+              >
+                <Text style={[styles.devBtnText, styles.devBtnTextGreen]}>🔑 ACCOUNTS</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.devBtn, styles.devBtnCyan]}
@@ -517,6 +525,8 @@ const styles = StyleSheet.create({
   },
   devRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
@@ -530,6 +540,9 @@ const styles = StyleSheet.create({
   devBtnCyan: {
     borderColor: Colors.neonCyan,
   },
+  devBtnGreen: {
+    borderColor: Colors.neonGreen,
+  },
   devBtnText: {
     color: Colors.neonMagenta,
     fontSize: 12,
@@ -537,6 +550,9 @@ const styles = StyleSheet.create({
   },
   devBtnTextCyan: {
     color: Colors.neonCyan,
+  },
+  devBtnTextGreen: {
+    color: Colors.neonGreen,
   },
   modalOverlay: {
     flex: 1,

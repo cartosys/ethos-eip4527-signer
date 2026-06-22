@@ -14,4 +14,6 @@ export type RootStackParamList = {
     origin?:       string;
   };
   Simulator: undefined;
+  Accounts: undefined;
+  AccountForm: { accountId?: string };
 };

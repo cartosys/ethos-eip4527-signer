@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,8 @@ import { AddressText } from '../components/AddressText';
 import { WarningRow } from '../components/WarningRow';
 import { ErrorView } from '../components/ErrorView';
 import { signLocally } from '../localSigner';
-import { Colors, Spacing, FontFamily, formatEth, formatGwei } from '../theme';
+import { findAccountByAddress, getPrivateKeyForAccountId, type Account } from '../store/accountsStore';
+import { Colors, Spacing, FontFamily, formatEth, formatGwei, truncateAddress } from '../theme';
 
 type Nav  = NativeStackNavigationProp<RootStackParamList, 'TxReview'>;
 type Route = RouteProp<RootStackParamList, 'TxReview'>;
@@ -109,10 +110,27 @@ export function TxReviewScreen() {
   const [confirmRisk, setConfirmRisk] = useState(false);
   const [error, setError]         = useState<{ code: string; message: string; recoverable: boolean } | null>(null);
 
+  const fromAddress = envelope.from as string | undefined;
+  const [matchedAccount, setMatchedAccount] = useState<Account | null>(null);
+  const [accountLookupDone, setAccountLookupDone] = useState(false);
+
+  useEffect(() => {
+    if (!fromAddress) { setAccountLookupDone(true); return; }
+    setAccountLookupDone(false);
+    findAccountByAddress(fromAddress)
+      .then(account => { setMatchedAccount(account); setAccountLookupDone(true); })
+      .catch(() => { setMatchedAccount(null); setAccountLookupDone(true); });
+  }, [fromAddress]);
+
+  const canSign = !fromAddress || (accountLookupDone && matchedAccount !== null);
+
   const doSign = async () => {
     setSigning(true);
     setConfirmRisk(false);
     try {
+      const privateKeyHex = matchedAccount
+        ? await getPrivateKeyForAccountId(matchedAccount.id)
+        : undefined;
       const result = await signLocally({
         to:                   envelope.to as string | undefined,
         value:                envelope.value as string | undefined,
@@ -122,7 +140,7 @@ export function TxReviewScreen() {
         maxPriorityFeePerGas: envelope.maxPriorityFeePerGas as string | undefined,
         data:                 envelope.data as string | undefined,
         chainId:              envelope.chainId as number | undefined,
-      });
+      }, privateKeyHex ?? undefined);
       navigation.navigate('SigningResult', {
         signedTx:      result.signedTx,
         signerAddress: result.signerAddress,
@@ -137,6 +155,7 @@ export function TxReviewScreen() {
   };
 
   const onSignPress = () => {
+    if (!canSign) return;
     if (hasCritical) { setConfirmRisk(true); return; }
     doSign();
   };
@@ -185,9 +204,13 @@ export function TxReviewScreen() {
 
         {/* Addresses */}
         <View style={styles.card}>
-          {(envelope.from as string | undefined) ? (
+          {fromAddress ? (
             <View style={styles.addrRow}>
-              <AddressText address={envelope.from as string} label="From" />
+              <Text style={styles.fromLabel}>FROM</Text>
+              {matchedAccount ? (
+                <Text style={styles.fromNickname}>{matchedAccount.nickname}</Text>
+              ) : null}
+              <Text style={styles.fromAddress}>{truncateAddress(fromAddress)}</Text>
             </View>
           ) : null}
           {(envelope.to as string | undefined) ? (
@@ -230,6 +253,12 @@ export function TxReviewScreen() {
           </View>
         )}
 
+        {fromAddress && accountLookupDone && !matchedAccount ? (
+          <Text style={styles.noKeyMessage}>
+            Unable to sign with {truncateAddress(fromAddress)} for this transaction: No private key saved.
+          </Text>
+        ) : null}
+
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={styles.btnReject}
@@ -240,9 +269,9 @@ export function TxReviewScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.btnSign, hasCritical && styles.btnSignRisk, signing && styles.btnDisabled]}
+            style={[styles.btnSign, hasCritical && styles.btnSignRisk, (signing || !canSign) && styles.btnDisabled]}
             onPress={onSignPress}
-            disabled={signing}
+            disabled={signing || !canSign}
           >
             {signing
               ? <ActivityIndicator color={Colors.bgDeep} size="small" />
@@ -344,6 +373,32 @@ const styles = StyleSheet.create({
     color: Colors.critical,
     fontSize: 13,
     paddingVertical: Spacing.sm,
+  },
+  fromLabel: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+  },
+  fromNickname: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  fromAddress: {
+    fontFamily: FontFamily.mono,
+    fontSize: 13,
+    color: Colors.textMono,
+    letterSpacing: 0.5,
+  },
+  noKeyMessage: {
+    fontSize: 12,
+    color: Colors.critical,
+    lineHeight: 18,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
   },
   warningsSection: {
     marginBottom: Spacing.md,

@@ -23,10 +23,10 @@ export interface SigningResult {
 const HARDHAT_FALLBACK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 const DEV_PRIVATE_KEY = ENV_PRIVATE_KEY ?? HARDHAT_FALLBACK;
 
-export async function signLocally(tx: LocalSignerInput): Promise<SigningResult> {
+export async function signLocally(tx: LocalSignerInput, privateKeyHex?: string): Promise<SigningResult> {
   const start = Date.now();
   try {
-    const wallet = new ethers.Wallet(DEV_PRIVATE_KEY);
+    const wallet = new ethers.Wallet(privateKeyHex ?? DEV_PRIVATE_KEY);
 
     const ethersTx: ethers.TransactionRequest = {
       to:                   tx.to,
