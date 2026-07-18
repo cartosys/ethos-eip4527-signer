@@ -1,13 +1,12 @@
 {
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": "."
+    "types": ["jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@ethos/signer": ["../src/index"]
+    }
   },
-  "include": ["src/**/*", "tests/**/*", "examples/**/*"]
+  "include": ["**/*.ts", "**/*.tsx", "../src/**/*.ts"],
+  "exclude": ["**/node_modules", "**/Pods"]
 }
